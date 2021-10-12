@@ -18,15 +18,27 @@
 
 FROM alpine:3.13 as builder
 
-RUN apk add build-base
-
 RUN set -eux; \
+    \
+    apk add build-base libunwind-dev libunwind-static; \
     \
     wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 \
       | tar -xj; \
+    export EXTRA_CFLAGS=-static \
+    export EXTRA_CXXFLAGS=-static \
+    export LDFLAGS="-static-libgcc -static-libstdc++"; \
     cd jemalloc-5.2.1; \
-    ./configure; \
-    make; \
+    ./configure \
+      --disable-shared \
+      --prefix=/usr \
+      --sysconfdir=/etc \
+      --disable-syscall \
+      --enable-prof --enable-prof-libunwind \
+      --with-static-libunwind=/usr/lib/libunwind-x86_64.a \
+      --disable-prof-libgcc --disable-prof-gcc \
+      --enable-static=no \
+      --enable-shared=yes; \
+    make -j$(nproc); \
     make install
 
 
@@ -44,8 +56,8 @@ ENV PATH=$FLINK_HOME/bin:$PATH
 USER root
 
 # Jemalloc setup
-COPY --from=builder /usr/local/lib/libjemalloc.so.2 /usr/local/lib/
-ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
+COPY --from=builder /usr/lib/libjemalloc.so.2 /usr/lib/
+# ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
 # Flink setup
 #
@@ -53,6 +65,7 @@ RUN set -eux; \
     \
 # Install dependencies
     apk add --no-cache --upgrade curl bash su-exec \
+      libstdc++ libgcc \
       snappy-dev \
       gettext-dev; \
     \
