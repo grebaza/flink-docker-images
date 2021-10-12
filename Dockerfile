@@ -16,6 +16,20 @@
 # limitations under the License.
 ###############################################################################
 
+FROM alpine:3.13 as builder
+
+RUN apk add build-base
+
+RUN set -eux; \
+    \
+    wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 \
+      | tar -xj; \
+    cd jemalloc-5.2.1; \
+    ./configure; \
+    make; \
+    make install
+
+
 FROM azul/zulu-openjdk-alpine:11.0.11-jre
 
 ENV FLINK_VERSION=1.14.0 \
@@ -28,6 +42,10 @@ ENV FLINK_URL_PATH=flink/flink-$FLINK_VERSION/flink-$FLINK_VERSION-bin-scala_$SC
 ENV PATH=$FLINK_HOME/bin:$PATH
 
 USER root
+
+# Jemalloc setup
+COPY --from=builder /usr/local/lib/libjemalloc.so.2 /usr/local/lib/
+ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so.2
 
 # Flink setup
 #
