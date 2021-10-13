@@ -24,9 +24,6 @@ RUN set -eux; \
     \
     wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 \
       | tar -xj; \
-    export EXTRA_CFLAGS=-static \
-    export EXTRA_CXXFLAGS=-static \
-    export LDFLAGS="-static-libgcc -static-libstdc++"; \
     cd jemalloc-5.2.1; \
     ./configure \
       --disable-shared \
@@ -34,11 +31,12 @@ RUN set -eux; \
       --sysconfdir=/etc \
       --disable-syscall \
       --enable-prof --enable-prof-libunwind \
-      --with-static-libunwind=/usr/lib/libunwind-x86_64.a \
       --disable-prof-libgcc --disable-prof-gcc \
       --enable-static=no \
       --enable-shared=yes; \
     make -j$(nproc); \
+    # stress and check tests
+    # make stress check -j$(nproc); \
     make install
 
 
@@ -55,9 +53,8 @@ ENV PATH=$FLINK_HOME/bin:$PATH
 
 USER root
 
-# Jemalloc setup
+# Jemalloc copy
 COPY --from=builder /usr/lib/libjemalloc.so.2 /usr/lib/
-# ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
 # Flink setup
 #
@@ -65,7 +62,7 @@ RUN set -eux; \
     \
 # Install dependencies
     apk add --no-cache --upgrade curl bash su-exec \
-      libstdc++ libgcc \
+      libstdc++ libgcc libunwind \
       snappy-dev \
       gettext-dev; \
     \
@@ -87,6 +84,9 @@ RUN set -eux; \
 # Change ownership
     chown -R flink $FLINK_HOME; \
     chgrp -R flink $FLINK_HOME
+
+# Jemalloc setup
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
 USER flink
 
