@@ -87,9 +87,6 @@ RUN set -eux; \
     chown -R flink $FLINK_HOME; \
     chgrp -R flink $FLINK_HOME
 
-# Jemalloc setup
-ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
-
 USER flink
 
 # Set the working directory to the Flink home directory
