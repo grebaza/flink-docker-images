@@ -25,17 +25,35 @@ COMMAND_HISTORY_SERVER="history-server"
 JOB_MANAGER_RPC_ADDRESS=${JOB_MANAGER_RPC_ADDRESS:-$(hostname -f)}
 CONF_FILE="${FLINK_HOME}/conf/flink-conf.yaml"
 
+get_jemalloc_path() {
+  local LJEMALLOC_PATH
+  OS=$(cat /etc/*-release | tr '[:upper:]' '[:lower:]' \
+    | grep -Eoi '^ID=(debian|ubuntu|red hat|centos|alpine)' \
+    | sed -e 's/^id=//p' | uniq)
+
+  case $OS in
+    ubuntu|debian)
+      LJEMALLOC_PATH=/usr/lib/x86_64-linux-gnu/libjemalloc.so
+      ;;
+    alpine)
+      LJEMALLOC_PATH=/usr/lib/libjemalloc.so
+      ;;
+  esac
+
+  echo "$LJEMALLOC_PATH"
+}
+
 drop_privs_cmd() {
-    if [ $(id -u) != 0 ]; then
-        # Don't need to drop privs if EUID != 0
-        return
-    elif [ -x /sbin/su-exec ]; then
-        # Alpine
-        echo su-exec flink
-    else
-        # Others
-        echo gosu flink
-    fi
+  if [ "$(id -u)" != 0 ]; then
+      # Don't need to drop privs if EUID != 0
+      return
+  elif [ -x /sbin/su-exec ]; then
+      # Alpine
+      echo su-exec flink
+  else
+      # Others
+      echo gosu flink
+  fi
 }
 
 copy_plugins_if_required() {
@@ -64,7 +82,7 @@ set_config_option() {
   local value=$2
 
   # escape periods for usage in regular expressions
-  local escaped_option=$(echo ${option} | sed -e "s/\./\\\./g")
+  local escaped_option=$(echo "${option}" | sed -e "s/\./\\\./g")
 
   # either override an existing entry, or append a new one
   if grep -E "^${escaped_option}:.*" "${CONF_FILE}" > /dev/null; then
@@ -75,24 +93,30 @@ set_config_option() {
 }
 
 prepare_configuration() {
-    set_config_option jobmanager.rpc.address ${JOB_MANAGER_RPC_ADDRESS}
-    set_config_option blob.server.port 6124
-    set_config_option query.server.port 6125
+  set_config_option jobmanager.rpc.address "${JOB_MANAGER_RPC_ADDRESS}"
+  set_config_option blob.server.port 6124
+  set_config_option query.server.port 6125
 
-    if [ -n "${TASK_MANAGER_NUMBER_OF_TASK_SLOTS}" ]; then
-        set_config_option taskmanager.numberOfTaskSlots ${TASK_MANAGER_NUMBER_OF_TASK_SLOTS}
-    fi
+  if [ -n "${TASK_MANAGER_NUMBER_OF_TASK_SLOTS}" ]; then
+      set_config_option taskmanager.numberOfTaskSlots "${TASK_MANAGER_NUMBER_OF_TASK_SLOTS}"
+  fi
 
-    if [ -n "${FLINK_PROPERTIES}" ]; then
-        echo "${FLINK_PROPERTIES}" >> "${CONF_FILE}"
-    fi
-    envsubst < "${CONF_FILE}" > "${CONF_FILE}.tmp" && mv "${CONF_FILE}.tmp" "${CONF_FILE}"
+  if [ -n "${FLINK_PROPERTIES}" ]; then
+      echo "${FLINK_PROPERTIES}" >> "${CONF_FILE}"
+  fi
+  envsubst < "${CONF_FILE}" > "${CONF_FILE}.tmp" \
+    && mv "${CONF_FILE}.tmp" "${CONF_FILE}"
 }
 
 maybe_enable_jemalloc() {
-    if [ "${DISABLE_JEMALLOC:-false}" == "false" ]; then
-        export LD_PRELOAD=$LD_PRELOAD:/usr/lib/x86_64-linux-gnu/libjemalloc.so
+  local LJEMALLOC_PATH
+  if [ "${DISABLE_JEMALLOC:-false}" == "false" ]; then
+    LJEMALLOC_PATH=$(get_jemalloc_path)
+    if [ -n $LJEMALLOC_PATH ]; then
+      echo "Setting LD_PRELOAD to $LJEMALLOC_PATH..."
+      export LD_PRELOAD=$LJEMALLOC_PATH
     fi
+  fi
 }
 
 maybe_enable_jemalloc
@@ -103,34 +127,38 @@ prepare_configuration
 
 args=("$@")
 if [ "$1" = "help" ]; then
-    printf "Usage: $(basename "$0") (jobmanager|${COMMAND_STANDALONE}|taskmanager|${COMMAND_HISTORY_SERVER})\n"
-    printf "    Or $(basename "$0") help\n\n"
-    printf "By default, Flink image adopts jemalloc as default memory allocator. This behavior can be disabled by setting the 'DISABLE_JEMALLOC' environment variable to 'true'.\n"
-    exit 0
+  cat << EOF
+Usage: $(basename "$0") (jobmanager|${COMMAND_STANDALONE}|taskmanager|${COMMAND_HISTORY_SERVER})
+    Or $(basename "$0") help
+
+By default, Flink image adopts jemalloc as default memory allocator. This
+behavior can be disabled by setting the 'DISABLE_JEMALLOC' envvar to 'true'
+EOF
+  exit 0
 elif [ "$1" = "jobmanager" ]; then
-    args=("${args[@]:1}")
+  args=("${args[@]:1}")
 
-    echo "Starting Job Manager"
+  echo "Starting Job Manager"
 
-    exec $(drop_privs_cmd) "$FLINK_HOME/bin/jobmanager.sh" start-foreground "${args[@]}"
+  exec $(drop_privs_cmd) "$FLINK_HOME/bin/jobmanager.sh" start-foreground "${args[@]}"
 elif [ "$1" = ${COMMAND_STANDALONE} ]; then
-    args=("${args[@]:1}")
+  args=("${args[@]:1}")
 
-    echo "Starting Job Manager"
+  echo "Starting Job Manager"
 
-    exec $(drop_privs_cmd) "$FLINK_HOME/bin/standalone-job.sh" start-foreground "${args[@]}"
+  exec $(drop_privs_cmd) "$FLINK_HOME/bin/standalone-job.sh" start-foreground "${args[@]}"
 elif [ "$1" = ${COMMAND_HISTORY_SERVER} ]; then
-    args=("${args[@]:1}")
+  args=("${args[@]:1}")
 
-    echo "Starting History Server"
+  echo "Starting History Server"
 
-    exec $(drop_privs_cmd) "$FLINK_HOME/bin/historyserver.sh" start-foreground "${args[@]}"
+  exec $(drop_privs_cmd) "$FLINK_HOME/bin/historyserver.sh" start-foreground "${args[@]}"
 elif [ "$1" = "taskmanager" ]; then
-    args=("${args[@]:1}")
+  args=("${args[@]:1}")
 
-    echo "Starting Task Manager"
+  echo "Starting Task Manager"
 
-    exec $(drop_privs_cmd) "$FLINK_HOME/bin/taskmanager.sh" start-foreground "${args[@]}"
+  exec $(drop_privs_cmd) "$FLINK_HOME/bin/taskmanager.sh" start-foreground "${args[@]}"
 fi
 
 args=("${args[@]}")

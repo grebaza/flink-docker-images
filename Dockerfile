@@ -26,7 +26,6 @@ RUN set -eux; \
       | tar -xj; \
     cd jemalloc-5.2.1; \
     ./configure \
-      --disable-shared \
       --prefix=/usr \
       --sysconfdir=/etc \
       --disable-syscall \
@@ -36,7 +35,7 @@ RUN set -eux; \
       --enable-shared=yes; \
     make -j$(nproc); \
     # stress and check tests
-    # make stress check -j$(nproc); \
+    # make -j$(nproc) check stress; \
     make install
 
 
