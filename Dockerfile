@@ -69,6 +69,7 @@ RUN set -eux; \
 # User and group creation
     addgroup -g 1001 -S flink; \
     adduser -G flink -u 1001 -s /bin/bash -h $FLINK_HOME -S -D flink; \
+    \
 # Download Flink
     curl -fSL -o /tmp/flink.tgz \
       $(curl --stderr /dev/null \
@@ -77,10 +78,12 @@ RUN set -eux; \
        )$FLINK_URL_PATH \
       || curl -fSL -o /tmp/flink.tgz \
       https://archive.apache.org/dist/$FLINK_URL_PATH; \
+    \
 # Verify the contents and then install ...
     echo "$SHA512HASH  /tmp/flink.tgz" | sha512sum -c -; \
     tar -xzf /tmp/flink.tgz -C $FLINK_HOME --strip-components 1; \
     rm -f /tmp/flink.tgz; \
+    \
 # Change ownership
     chown -R flink $FLINK_HOME; \
     chgrp -R flink $FLINK_HOME
