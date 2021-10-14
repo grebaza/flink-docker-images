@@ -36,7 +36,7 @@ get_jemalloc_path() {
       LJEMALLOC_PATH=/usr/lib/x86_64-linux-gnu/libjemalloc.so
       ;;
     alpine)
-      LJEMALLOC_PATH=/usr/lib/libjemalloc.so
+      LJEMALLOC_PATH=/usr/lib/libjemalloc.so.2
       ;;
   esac
 
@@ -114,7 +114,7 @@ maybe_enable_jemalloc() {
     LJEMALLOC_PATH=$(get_jemalloc_path)
     if [ -n $LJEMALLOC_PATH ]; then
       echo "Setting LD_PRELOAD to $LJEMALLOC_PATH..."
-      export LD_PRELOAD=$LJEMALLOC_PATH
+      export LD_PRELOAD="$LD_PRELOAD:$LJEMALLOC_PATH"
     fi
   fi
 }
