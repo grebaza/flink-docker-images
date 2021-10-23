@@ -39,7 +39,7 @@ RUN set -eux; \
     make install
 
 
-FROM azul/zulu-openjdk-alpine:11.0.11-jre
+FROM azul/zulu-openjdk-alpine:11.0.11-jre as flink_base
 
 ENV FLINK_VERSION=1.14.0 \
     SCALA_VERSION=2.12 \
@@ -97,3 +97,62 @@ COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 EXPOSE 6123 8081
 CMD ["help"]
+
+
+
+
+FROM flink_base as flink
+
+COPY docker-maven-download.sh /usr/local/bin/docker-maven-download
+
+# Setup connectors jar ...
+ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
+    FLC_AVRO_MD5=ec53385fc7d8cca815dc6130104f0ba0 \
+    FLC_CLIENTS_MD5=63cf4c7d9173b6695b94cdd8cb3b132b \
+    FLC_JDBC_MD5=8780af9e23c726d588c83f528f6a4bd5 \
+    FLC_NIFI_MD5=fefe88d167b5df3db1d03c726e3dffb6 \
+    FLC_COMPRESS_MD5=3ce465e7880fe842478fc7979ee3114e \
+    FLC_PARQUET_MD5=e5c3910cdb4c0ba0214ff306d4c8b42c \
+    FLC_KAFKA_MD5=64b3d312f9c2fdc21e788c1baf57afa9 \
+    FLC_SQL_KAFKA_MD5=62cb7bfe2f650430ef1b68fca26af371 \
+    FLC_SQL_AVRO_CONFLUENT_REGISTRY_MD5=0e9bfe5e7c7e0da55dc64d6d95934f57 \
+    JDBC_PG_VERSION="42.2.14" \
+    JDBC_PG_MD5=79869645ab65d5ef28024fc96bb1ce28
+
+RUN set -eux; \
+    \
+    FLINK_REPO_PATH=org/apache/flink;
+# DataStream connectors
+    docker-maven-download central $REPO_PATH flink-connector-jdbc_$SCALA_VERSION \
+        "$FLINK_VERSION" "$FLC_JDBC_MD5"; \
+    \
+    docker-maven-download central $REPO_PATH flink-connector-kafka_$SCALA_VERSION \
+        "$FLINK_VERSION" "$FLC_KAFKA_MD5"; \
+    \
+    docker-maven-download central $REPO_PATH flink-connector-nifi_$SCALA_VERSION \
+        "$FLINK_VERSION" "$FLC_NIFI_MD5"; \
+    \
+# Table API connectors
+    docker-maven-download central $REPO_PATH flink-sql-connector-kafka_$SCALA_VERSION \
+        "$FLINK_VERSION" "$FLC_SQL_KAFKA_MD5"; \
+    \
+    docker-maven-download central $REPO_PATH flink-sql-avro-confluent-registry \
+        "$FLINK_VERSION" "$FLC_AVRO_SQL_CONFLUENT_REGISTRY_MD5"; \
+    \
+# DataSet connectors
+    docker-maven-download central $REPO_PATH flink-avro \
+        "$FLINK_VERSION" "$FLC_AVRO_MD5"; \
+    \
+# Other libs
+    docker-maven-download central $REPO_PATH flink-clients \
+        "$FLINK_VERSION" "$FLC_CLIENTS_MD5"; \
+    \
+    docker-maven-download central $REPO_PATH flink-compress \
+        "$FLINK_VERSION" "$FLC_COMPRESS_MD5"; \
+    \
+    docker-maven-download central $REPO_PATH flink-parquet_$SCALA_VERSION \
+        "$FLINK_VERSION" "$FLC_PARQUET_MD5"; \
+    \
+# JDBC drivers
+    docker-maven-download central $REPO_PATH postgresql \
+        "$JDBC_PG_VERSION" "$JDBC_PG_MD5"
