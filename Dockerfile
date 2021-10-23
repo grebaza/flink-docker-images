@@ -121,7 +121,7 @@ ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
 
 RUN set -eux; \
     \
-    FLINK_REPO_PATH=org/apache/flink;
+    FLINK_REPO_PATH=org/apache/flink; \
 # DataStream connectors
     docker-maven-download central $REPO_PATH flink-connector-jdbc_$SCALA_VERSION \
         "$FLINK_VERSION" "$FLC_JDBC_MD5"; \
