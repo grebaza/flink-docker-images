@@ -107,6 +107,7 @@ COPY docker-maven-download.sh /usr/local/bin/docker-maven-download
 
 # Setup connectors jar ...
 ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
+    FLC_BASE_MD5=e29b9d2904e4cefa7ab6e9975be8d630 \
     FLC_AVRO_MD5=ec53385fc7d8cca815dc6130104f0ba0 \
     FLC_CLIENTS_MD5=63cf4c7d9173b6695b94cdd8cb3b132b \
     FLC_JDBC_MD5=8780af9e23c726d588c83f528f6a4bd5 \
@@ -121,8 +122,11 @@ ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
 
 RUN set -eux; \
     \
-    FLINK_REPO_PATH=org/apache/flink; \
+    REPO_PATH=org/apache/flink; \
 # DataStream connectors
+    docker-maven-download central $REPO_PATH flink-connector-base \
+        "$FLINK_VERSION" "$FLC_BASE_MD5"; \
+    \
     docker-maven-download central $REPO_PATH flink-connector-jdbc_$SCALA_VERSION \
         "$FLINK_VERSION" "$FLC_JDBC_MD5"; \
     \
@@ -137,14 +141,14 @@ RUN set -eux; \
         "$FLINK_VERSION" "$FLC_SQL_KAFKA_MD5"; \
     \
     docker-maven-download central $REPO_PATH flink-sql-avro-confluent-registry \
-        "$FLINK_VERSION" "$FLC_AVRO_SQL_CONFLUENT_REGISTRY_MD5"; \
+        "$FLINK_VERSION" "$FLC_SQL_AVRO_CONFLUENT_REGISTRY_MD5"; \
     \
 # DataSet connectors
     docker-maven-download central $REPO_PATH flink-avro \
         "$FLINK_VERSION" "$FLC_AVRO_MD5"; \
     \
 # Other libs
-    docker-maven-download central $REPO_PATH flink-clients \
+    docker-maven-download central $REPO_PATH flink-clients_$SCALA_VERSION \
         "$FLINK_VERSION" "$FLC_CLIENTS_MD5"; \
     \
     docker-maven-download central $REPO_PATH flink-compress \
@@ -154,5 +158,5 @@ RUN set -eux; \
         "$FLINK_VERSION" "$FLC_PARQUET_MD5"; \
     \
 # JDBC drivers
-    docker-maven-download central $REPO_PATH postgresql \
+    docker-maven-download central org/postgresql postgresql \
         "$JDBC_PG_VERSION" "$JDBC_PG_MD5"
