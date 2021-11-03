@@ -1,0 +1,38 @@
+diff --git a/transport-native-epoll/pom.xml b/transport-native-epoll/pom.xml
+index 07c5657..56e56cf 100644
+--- a/transport-native-epoll/pom.xml
++++ b/transport-native-epoll/pom.xml
+@@ -34,7 +34,7 @@
+     <unix.common.lib.dir>${project.build.directory}/unix-common-lib</unix.common.lib.dir>
+     <unix.common.lib.unpacked.dir>${unix.common.lib.dir}/META-INF/native/lib</unix.common.lib.unpacked.dir>
+     <unix.common.include.unpacked.dir>${unix.common.lib.dir}/META-INF/native/include</unix.common.include.unpacked.dir>
+-    <jni.compiler.args.cflags>CFLAGS=-O3 -Werror -fno-omit-frame-pointer -Wunused-variable -fvisibility=hidden -I${unix.common.include.unpacked.dir}</jni.compiler.args.cflags>
++    <jni.compiler.args.cflags>CFLAGS=-D__USE_GNU -O3 -Werror -fno-omit-frame-pointer -Wunused-variable -fvisibility=hidden -I${unix.common.include.unpacked.dir}</jni.compiler.args.cflags>
+     <jni.compiler.args.ldflags>LDFLAGS=-L${unix.common.lib.unpacked.dir} -Wl,--no-as-needed -lrt -ldl -Wl,--whole-archive -l${unix.common.lib.name} -Wl,--no-whole-archive</jni.compiler.args.ldflags>
+     <nativeSourceDirectory>${project.basedir}/src/main/c</nativeSourceDirectory>
+     <skipTests>true</skipTests>
+diff --git a/transport-native-epoll/src/main/c/netty_epoll_linuxsocket.c b/transport-native-epoll/src/main/c/netty_epoll_linuxsocket.c
+index 62e656f..80d9a66 100644
+--- a/transport-native-epoll/src/main/c/netty_epoll_linuxsocket.c
++++ b/transport-native-epoll/src/main/c/netty_epoll_linuxsocket.c
+@@ -21,6 +21,7 @@
+  */
+ #define _GNU_SOURCE
+ 
++#include <sys/types.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <errno.h>
+diff --git a/transport-native-unix-common/pom.xml b/transport-native-unix-common/pom.xml
+index 85a801f..b472e8a 100644
+--- a/transport-native-unix-common/pom.xml
++++ b/transport-native-unix-common/pom.xml
+@@ -153,7 +153,7 @@
+                       <env key="LIB_DIR" value="${nativeLibOnlyDir}" />
+                       <env key="OBJ_DIR" value="${nativeObjsOnlyDir}" />
+                       <env key="JNI_PLATFORM" value="${jni.platform}" />
+-                      <env key="CFLAGS" value="-O3 -Werror -Wno-attributes -fPIC -fno-omit-frame-pointer -Wunused-variable -fvisibility=hidden" />
++                      <env key="CFLAGS" value="-D__USE_GNU -O3 -Werror -Wno-attributes -fPIC -fno-omit-frame-pointer -Wunused-variable -fvisibility=hidden" />
+                       <env key="LDFLAGS" value="-Wl,--no-as-needed -lrt" />
+                       <env key="LIB_NAME" value="${nativeLibName}" />
+                       <!-- support for __attribute__((weak_import)) by the linker was added in 10.2 so ensure we

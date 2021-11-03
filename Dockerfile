@@ -16,15 +16,39 @@
 # limitations under the License.
 ###############################################################################
 
-FROM alpine:3.13 as builder
+
+ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.13
+ARG BUILD_IMAGE=alpine:3.14
+
+ARG FLINK_VERSION=1.14.0
+ARG FLINK_SCALA_VERSION=2.12
+ARG FLINK_HOME=/flink
+ARG FLINK_SHA512HASH="b2895b4f3b905e03a2b394f7da089c70d7148a027fb350de440222e8e0326da9d8a22af8fbcaa705ba6faf81845b6dc3af9ec085325e948447713e86859fc759"
+ARG FLINK_MINOR_VERSION=14.0
+
+ARG JEMALLOC_VERSION=5.2.1
+ARG TCNATIVE_VERSION=2.0.39.Final
+ARG NETTY_VERSION=4.1.65.Final
+ARG NETTY_JNI_UTIL_VERSION=0.0.3.Final
+
+ARG FLS_TCNATIVE=flink-shaded-netty-tcnative-static
+ARG FLS_NETTYALL=flink-shaded-netty
+ARG FLS_PATH=/flink-shaded
+ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_MINOR_VERSION.jar
+ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_MINOR_VERSION.jar
+
+
+FROM ${BUILD_IMAGE} as builder
+ARG JEMALLOC_VERSION
 
 RUN set -eux; \
     \
-    apk add build-base libunwind-dev libunwind-static; \
+    apk add alpine-sdk libunwind-dev libunwind-static; \
     \
-    wget -O - https://github.com/jemalloc/jemalloc/releases/download/5.2.1/jemalloc-5.2.1.tar.bz2 \
-      | tar -xj; \
-    cd jemalloc-5.2.1; \
+    JEMALLOC_REPO=https://github.com/jemalloc/jemalloc/releases/download/$JEMALLOC_VERSION; \
+    JEMALLLOC_TAR=jemalloc-$JEMALLOC_VERSION.tar.bz2; \
+    wget -O - $JEMALLOC_REPO/$JEMALLLOC_TAR | tar -xj; \
+    cd jemalloc-$JEMALLOC_VERSION; \
     ./configure \
       --prefix=/usr \
       --sysconfdir=/etc \
@@ -36,16 +60,94 @@ RUN set -eux; \
     make -j$(nproc); \
     # stress and check tests
     # make -j$(nproc) check stress; \
-    make install
+    make install; \
+    cd ..
 
 
-FROM azul/zulu-openjdk-alpine:11.0.13-jre as flink_base
 
-ENV FLINK_VERSION=1.14.0 \
-    SCALA_VERSION=2.12 \
-    KAFKA_CLIENTS_VERSION=3.0.0 \
-    FLINK_HOME=/flink \
-    SHA512HASH="b2895b4f3b905e03a2b394f7da089c70d7148a027fb350de440222e8e0326da9d8a22af8fbcaa705ba6faf81845b6dc3af9ec085325e948447713e86859fc759"
+
+FROM ${JDK_IMAGE} as mvn_builder
+ARG FLS_PATH
+ARG NETTY_VERSION
+ARG TCNATIVE_VERSION
+ARG NETTY_JNI_UTIL_VERSION
+ARG FLINK_VERSION
+
+
+COPY netty.patch /
+RUN set -eux; \
+    \
+    apk add \
+      alpine-sdk libunwind-dev libunwind-static \
+      openssl-dev openssl-libs-static libffi-dev apr-dev \
+      samurai libtool \
+      autoconf automake cmake \
+      go \
+      maven; \
+    \
+# Build Netty and Tcnative dependents (jni-util, build-common)
+    git clone \
+        --depth 1 \
+        --branch netty-jni-util-$NETTY_JNI_UTIL_VERSION \
+        https://github.com/netty/netty-jni-util.git; \
+    cd netty-jni-util; \
+    mvn clean install; \
+    cd ..; \
+    \
+# Build Netty (for use in flink-shaded-netty-4)
+    git clone \
+        --depth 1 \
+        --branch netty-$NETTY_VERSION \
+        https://github.com/netty/netty.git; \
+    cd netty; \
+    patch -p1 < /netty.patch; \
+    mvn clean install -DskipTests; \
+    mvn clean install -pl all -Puber-snapshot; \
+    cd ..; \
+    \
+# Build Tcnative as uber jar
+    git clone \
+        --depth 1 \
+        --branch netty-tcnative-parent-$TCNATIVE_VERSION \
+        https://github.com/netty/netty-tcnative.git; \
+    cd netty-tcnative; \
+    for profile in "boringssl-static-default" "uber-snapshot"; do \
+      mvn clean install -P$profile -pl boringssl-static; \
+    done; \
+    cd ..; \
+    \
+# Build Flink shaded for Netty ant Tcnative
+    FLINK_MINOR_VERSION=$(echo $FLINK_VERSION | cut -d '.' -f 2,3); \
+    git clone \
+        --depth 1 \
+        --branch release-$FLINK_MINOR_VERSION \
+        https://github.com/apache/flink-shaded.git $FLS_PATH; \
+    cd $FLS_PATH; \
+    for module in "netty-4" "netty-tcnative-static"; do \
+      mvn clean package \
+          -Pinclude-netty-tcnative-static \
+          -pl flink-shaded-$module; \
+    done; \
+    cd ..; \
+    echo 'Flink Shaded Jars built!'
+
+
+
+
+FROM ${JDK_IMAGE}-jre as flink_base
+ARG FLINK_VERSION
+ARG FLINK_MINOR_VERSION
+ARG FLINK_SCALA_VERSION
+ARG FLINK_HOME
+ARG FLINK_SHA512HASH
+ARG FLS_TCNATIVE_JAR
+ARG FLS_NETTYALL_JAR
+ARG TCNATIVE_VERSION
+
+ENV FLINK_VERSION=$FLINK_VERSION \
+    SCALA_VERSION=$FLINK_SCALA_VERSION \
+    FLINK_HOME=$FLINK_HOME \
+    SHA512HASH=$FLINK_SHA512HASH
 
 ENV FLINK_URL_PATH=flink/flink-$FLINK_VERSION/flink-$FLINK_VERSION-bin-scala_$SCALA_VERSION.tgz
 
@@ -63,6 +165,7 @@ RUN set -eux; \
 # Install dependencies
     apk add --no-cache --upgrade curl bash su-exec \
       libstdc++ libgcc libunwind \
+      openssl \
       snappy-dev \
       gettext-dev; \
     \
@@ -87,6 +190,10 @@ RUN set -eux; \
 # Change ownership
     chown -R flink $FLINK_HOME; \
     chgrp -R flink $FLINK_HOME
+
+# Netty tcnative library
+COPY --from=mvn_builder $FLS_TCNATIVE_JAR /$FLINK_HOME/lib/
+COPY --from=mvn_builder $FLS_NETTYALL_JAR /$FLINK_HOME/lib/
 
 USER flink
 
@@ -115,6 +222,7 @@ ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
     FLC_TCOM_MD5=179aa7d3604fadd28e2021a39709c0e3 \
     FLC_AVRO_MD5=ec53385fc7d8cca815dc6130104f0ba0 \
     FLC_CLIENTS_MD5=63cf4c7d9173b6695b94cdd8cb3b132b \
+    KFK_CLIENTS_VERSION=3.0.0 \
     KFK_CLIENTS_MD5=8f9e814b615801f50e412859d8490ea7 \
     FLC_JDBC_MD5=8780af9e23c726d588c83f528f6a4bd5 \
     FLC_NIFI_MD5=fefe88d167b5df3db1d03c726e3dffb6 \
@@ -135,7 +243,7 @@ RUN set -eux; \
 #        "$FLINK_VERSION" "$FLC_BASE_MD5"; \
 #    \
     docker-maven-download central $REPO_PATH_KAFKA kafka-clients \
-        "$KAFKA_CLIENTS_VERSION" "$KFK_CLIENTS_MD5"; \
+        "$KFK_CLIENTS_VERSION" "$KFK_CLIENTS_MD5"; \
     \
     docker-maven-download central $REPO_PATH flink-table-api-scala_$SCALA_VERSION \
         "$FLINK_VERSION" "$FLC_TAPI_MD5"; \
