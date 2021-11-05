@@ -2,8 +2,10 @@
 #
 # Import deploy config (change w/ `make dpl="deploy_special.env" release`)
 dpl ?= deploy.env
+ifneq ($(wildcard $(dpl)),)
 include $(dpl)
 export $(shell sed 's/=.*//' $(dpl))
+endif
 
 # Recipe vars
 USERNAME=$(USER)
