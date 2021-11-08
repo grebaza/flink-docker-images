@@ -74,7 +74,7 @@ ARG NETTY_JNI_UTIL_VERSION
 ARG FLINK_VERSION
 
 
-COPY netty.patch /
+COPY netty-$NETTY_VERSION.patch /
 RUN set -eux; \
     \
     apk add \
@@ -100,7 +100,7 @@ RUN set -eux; \
         --branch netty-$NETTY_VERSION \
         https://github.com/netty/netty.git; \
     cd netty; \
-    patch -p1 < /netty.patch; \
+    patch -p1 < /netty-$NETTY_VERSION.patch; \
     mvn clean install -DskipTests; \
     mvn clean install -pl all -Puber-snapshot; \
     cd ..; \
