@@ -221,6 +221,7 @@ ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
     FLC_STRM_MD5=74a3bf11d468759271a19683ef225abe \
     FLC_TCOM_MD5=179aa7d3604fadd28e2021a39709c0e3 \
     FLC_AVRO_MD5=ec53385fc7d8cca815dc6130104f0ba0 \
+    FLC_SAVRO_MD5=9e2a2894b04f590e498fd90563b3870c \
     FLC_CLIENTS_MD5=63cf4c7d9173b6695b94cdd8cb3b132b \
     KFK_CLIENTS_VERSION=3.0.0 \
     KFK_CLIENTS_MD5=8f9e814b615801f50e412859d8490ea7 \
@@ -273,6 +274,8 @@ RUN set -eux; \
     docker-maven-download central $REPO_PATH flink-sql-avro-confluent-registry \
         "$FLINK_VERSION" "$FLC_SQL_AVRO_CONFLUENT_REGISTRY_MD5"; \
     \
+    docker-maven-download central $REPO_PATH flink-sql-avro \
+        "$FLINK_VERSION" "$FLC_SAVRO_MD5"; \
 # DataSet connectors
     docker-maven-download central $REPO_PATH flink-avro \
         "$FLINK_VERSION" "$FLC_AVRO_MD5"; \
