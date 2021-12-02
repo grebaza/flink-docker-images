@@ -30,7 +30,8 @@ help: ## This help
 # DOCKER TASKS
 # Build the container
 build: ## Build the container
-	docker build $(DOCKER_BUILD_ARGS) -t $(IMAGE):$(VERSION) $(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH)
+	docker build $(DOCKER_BUILD_ARGS) $(shell ./get-dependencies.sh $(VERSION)) \
+		-t $(IMAGE):$(VERSION) $(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH)
 
 release: build push ## Make a release by building and pushing the `{version}` and `latest` tagged containers to Container Registry (CR)
 
