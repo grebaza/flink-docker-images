@@ -33,4 +33,4 @@
 --- /dev/null
 +++ b/build-vars.sh
 @@ -0,0 +1 @@
-+export NETTY_NATIVE_PROFILE=uber-snapshot
++export NETTY_NATIVE_PROFILE=native-dependencies

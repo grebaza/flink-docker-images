@@ -14,6 +14,7 @@ IMAGE=$(REGISTRY_HOST)/$(USERNAME)/$(NAME)
 DOCKER_BUILD_CONTEXT=.
 DOCKER_FILE_PATH=Dockerfile
 VERSION=$(or $(shell git tag -l --points-at HEAD), SNAPSHOT)
+MINOR_VERSION=$(shell echo $(VERSION) | cut -d '.' -f 2,3 | sed 's/-SNAPSHOT/.0/g')
 
 
 # HELP
@@ -30,7 +31,10 @@ help: ## This help
 # DOCKER TASKS
 # Build the container
 build: ## Build the container
-	docker build $(DOCKER_BUILD_ARGS) $(shell ./get-dependencies.sh $(VERSION)) \
+	docker build $(shell ./get-dependencies.sh $(VERSION)) \
+		--build-arg FLINK_VERSION=$(VERSION) $(DOCKER_BUILD_ARGS) \
+		--build-arg FLINK_MINOR_VERSION=$(MINOR_VERSION) \
+		--target flink_$(if $(findstring -SNAPSHOT, $(VERSION)),snapshot,stable) \
 		-t $(IMAGE):$(VERSION) $(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH)
 
 release: build push ## Make a release by building and pushing the `{version}` and `latest` tagged containers to Container Registry (CR)

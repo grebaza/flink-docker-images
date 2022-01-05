@@ -72,9 +72,10 @@ ARG NETTY_VERSION
 ARG TCNATIVE_VERSION
 ARG NETTY_JNI_UTIL_VERSION
 ARG FLINK_VERSION
+ARG FLINK_SCALA_VERSION
 
 
-COPY netty-$NETTY_VERSION.patch /
+COPY *.patch /
 RUN set -eux; \
     \
     apk add \
@@ -101,8 +102,10 @@ RUN set -eux; \
         https://github.com/netty/netty.git; \
     cd netty; \
     patch -p1 < /netty-$NETTY_VERSION.patch; \
-    mvn clean install -DskipTests; \
-    mvn clean install -pl all -Puber-snapshot; \
+    . build-vars.sh; \
+    mvn -am -pl resolver-dns-native-macos,transport-native-unix-common,transport-native-kqueue \
+        clean install -DskipTests=true; \
+    mvn -Pfull,$NETTY_NATIVE_PROFILE -pl all clean install; \
     cd ..; \
     \
 # Build Tcnative as uber jar
@@ -117,10 +120,17 @@ RUN set -eux; \
     cd ..; \
     \
 # Build Flink shaded for Netty ant Tcnative
-    FLINK_MINOR_VERSION=$(echo $FLINK_VERSION | cut -d '.' -f 2,3); \
+    if [[ $FLINK_VERSION == "1.15-SNAPSHOT" ]]; then \
+        BRANCH=release-15.0-rc1; \
+    elif [[ $FLINK_VERSION == *SNAPSHOT ]]; then \
+        BRANCH=master; \
+    else \
+        FLINK_MINOR_VERSION=$(echo $FLINK_VERSION | cut -d '.' -f 2,3); \
+        BRANCH=release-$FLINK_MINOR_VERSION; \
+    fi; \
     git clone \
         --depth 1 \
-        --branch release-$FLINK_MINOR_VERSION \
+        --branch $BRANCH \
         https://github.com/apache/flink-shaded.git $FLS_PATH; \
     cd $FLS_PATH; \
     for module in "netty-4" "netty-tcnative-static"; do \
@@ -131,7 +141,32 @@ RUN set -eux; \
     cd ..; \
     echo 'Flink Shaded Jars built!'
 
-
+RUN set -eux; \
+    \
+# Build Flink if SNAPSHOT version
+    if [[ $FLINK_VERSION == *SNAPSHOT ]]; then \
+      git clone --depth 1 --branch master \
+          https://github.com/apache/flink.git; \
+      cd flink; \
+      patch -p1 < /flink-$FLINK_VERSION.patch; \
+      . build-vars.sh; cd ..; \
+      \
+      git clone --depth 1 --branch v$PROTOBUF_VERSION \
+          https://github.com/google/protobuf.git; \
+      cd protobuf; \
+      patch -p1 < /protobuf-$PROTOBUF_VERSION.patch; \
+      ./autogen.sh; cd protoc-artifacts && mvn install; \
+      . build-vars.sh; cp $PROTOBUF_FILE /usr/bin/protoc; \
+      cd ../../flink; \
+      \
+      mvn clean package -Dscala-$FLINK_SCALA_VERSION -DskipTests \
+          -DprotocCommand=/usr/bin/protoc \
+          -DprotocExecutable=/usr/bin/protoc; \
+      cd ..; \
+      echo 'Flink built!'; \
+    else \
+      mkdir -p /flink && touch /flink/build-target; \
+    fi;
 
 
 FROM ${JDK_IMAGE}-jre as flink_base
@@ -171,25 +206,7 @@ RUN set -eux; \
     \
 # User and group creation
     addgroup -g 1001 -S flink; \
-    adduser -G flink -u 1001 -s /bin/bash -h $FLINK_HOME -S -D flink; \
-    \
-# Download Flink
-    curl -fSL -o /tmp/flink.tgz \
-      $(curl --stderr /dev/null \
-          https://www.apache.org/dyn/closer.cgi\?as_json\=1 \
-          | sed -rn 's/.*"preferred":.*"(.*)"/\1/p' \
-       )$FLINK_URL_PATH \
-      || curl -fSL -o /tmp/flink.tgz \
-      https://archive.apache.org/dist/$FLINK_URL_PATH; \
-    \
-# Verify the contents and then install ...
-    echo "$SHA512HASH  /tmp/flink.tgz" | sha512sum -c -; \
-    tar -xzf /tmp/flink.tgz -C $FLINK_HOME --strip-components 1; \
-    rm -f /tmp/flink.tgz; \
-    \
-# Change ownership
-    chown -R flink $FLINK_HOME; \
-    chgrp -R flink $FLINK_HOME
+    adduser -G flink -u 1001 -s /bin/bash -h $FLINK_HOME -S -D flink;
 
 # Netty tcnative library
 COPY --from=mvn_builder $FLS_TCNATIVE_JAR /$FLINK_HOME/lib/
@@ -207,13 +224,47 @@ EXPOSE 6123 8081
 CMD ["help"]
 
 
+# Snapshot version
+# ================
+FROM flink_base as flink_snapshot
+
+COPY --from=mvn_builder --chown=flink /flink/build-target $FLINK_HOME
+COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15-SNAPSHOT.jar /flink/opt
+COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15-SNAPSHOT.jar /flink/opt
+COPY --from=mvn_builder /flink/flink-python/target/flink-python_2.12-1.15-SNAPSHOT.jar /flink/opt
 
 
-FROM flink_base as flink
+# Stable version
+# ==============
+FROM flink_base as flink_stable
 
-COPY docker-maven-download.sh /usr/local/bin/docker-maven-download
+USER root
+RUN set -eux; \
+    \
+    if [[ $FLINK_VERSION != *SNAPSHOT ]]; then \
+# Download Flink
+      curl -fSL -o /tmp/flink.tgz \
+        $(curl --stderr /dev/null \
+            https://www.apache.org/dyn/closer.cgi\?as_json\=1 \
+            | sed -rn 's/.*"preferred":.*"(.*)"/\1/p' \
+         )$FLINK_URL_PATH \
+        || curl -fSL -o /tmp/flink.tgz \
+        https://archive.apache.org/dist/$FLINK_URL_PATH; \
+      \
+# Verify the contents and then install ...
+      echo "$SHA512HASH  /tmp/flink.tgz" | sha512sum -c -; \
+      tar -xzf /tmp/flink.tgz -C $FLINK_HOME --strip-components 1; \
+      rm -f /tmp/flink.tgz; \
+# Change ownership
+      chown -R flink $FLINK_HOME; \
+      chgrp -R flink $FLINK_HOME; \
+    fi;
+
+USER flink
 
 # Setup connectors jar ...
+COPY docker-maven-download.sh /usr/local/bin/docker-maven-download
+
 ENV MAVEN_DEP_DESTINATION=$FLINK_HOME/opt \
     FLC_BASE_MD5=e29b9d2904e4cefa7ab6e9975be8d630 \
     FLC_TAPI_MD5=d95885b97eeebec13f95f73fa81afaee \
@@ -292,4 +343,4 @@ RUN set -eux; \
     \
 # JDBC drivers
     docker-maven-download central org/postgresql postgresql \
-        "$JDBC_PG_VERSION" "$JDBC_PG_MD5"
+        "$JDBC_PG_VERSION" "$JDBC_PG_MD5";

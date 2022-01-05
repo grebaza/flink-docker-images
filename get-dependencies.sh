@@ -20,9 +20,11 @@
 
 VERSION="${1:-1.14.0}"
 DEP_JSON="${2:-packages.json}"
+VAR_SUFFIX="${3:-_VERSION}"
+VAR_PREFIX="${4:-}"
 while read -rd $'' line
 do
-  var_name=$(echo "$line" | sed -r "s/([^=]*)=.*/\1/g" | tr [:lower:] [:upper:])_VERSION
+  var_name="$VAR_PREFIX"$(echo "$line" | sed -r "s/([^=]*)=.*/\1/g" | tr [:lower:] [:upper:])"$VAR_SUFFIX"
   var_value=$(echo "$line" | sed -r "s/([^=]*)=(.*)$/\2/g")
   printf " --build-arg $var_name=$var_value"
 done < <(jq -r \

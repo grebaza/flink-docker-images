@@ -8,7 +8,7 @@
   "1.15-SNAPSHOT": {
     "jemalloc": "5.2.1",
     "tcnative": "2.0.44.Final",
-    "netty": "4.1.65.Final",
+    "netty": "4.1.70.Final",
     "netty_jni_util": "0.0.3.Final"
   }
 }
