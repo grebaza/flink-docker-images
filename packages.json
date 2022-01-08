@@ -3,12 +3,14 @@
     "jemalloc": "5.2.1",
     "tcnative": "2.0.39.Final",
     "netty": "4.1.65.Final",
-    "netty_jni_util": "0.0.3.Final"
+    "netty_jni_util": "0.0.3.Final",
+    "flink_shaded": "14.0"
   },
   "1.15-SNAPSHOT": {
     "jemalloc": "5.2.1",
-    "tcnative": "2.0.44.Final",
-    "netty": "4.1.70.Final",
-    "netty_jni_util": "0.0.3.Final"
+    "tcnative": "2.0.39.Final",
+    "netty": "4.1.65.Final",
+    "netty_jni_util": "0.0.3.Final",
+    "flink_shaded": "14.0"
   }
 }

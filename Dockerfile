@@ -30,12 +30,13 @@ ARG JEMALLOC_VERSION=5.2.1
 ARG TCNATIVE_VERSION=2.0.39.Final
 ARG NETTY_VERSION=4.1.65.Final
 ARG NETTY_JNI_UTIL_VERSION=0.0.3.Final
+ARG FLINK_SHADED_VERSION=14.0
 
 ARG FLS_TCNATIVE=flink-shaded-netty-tcnative-static
 ARG FLS_NETTYALL=flink-shaded-netty
 ARG FLS_PATH=/flink-shaded
-ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_MINOR_VERSION.jar
-ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_MINOR_VERSION.jar
+ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_SHADED_VERSION.jar
+ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_SHADED_VERSION.jar
 
 
 FROM ${BUILD_IMAGE} as builder
@@ -71,6 +72,7 @@ ARG FLS_PATH
 ARG NETTY_VERSION
 ARG TCNATIVE_VERSION
 ARG NETTY_JNI_UTIL_VERSION
+ARG FLINK_SHADED_VERSION
 ARG FLINK_VERSION
 ARG FLINK_SCALA_VERSION
 
@@ -103,7 +105,7 @@ RUN set -eux; \
     cd netty; \
     patch -p1 < /netty-$NETTY_VERSION.patch; \
     . build-vars.sh; \
-    mvn -am -pl resolver-dns-native-macos,transport-native-unix-common,transport-native-kqueue \
+    mvn -am -pl transport-native-unix-common,transport-native-kqueue,transport-native-epoll \
         clean install -DskipTests=true; \
     mvn -Pfull,$NETTY_NATIVE_PROFILE -pl all clean install; \
     cd ..; \
@@ -120,21 +122,13 @@ RUN set -eux; \
     cd ..; \
     \
 # Build Flink shaded for Netty ant Tcnative
-    if [[ $FLINK_VERSION == "1.15-SNAPSHOT" ]]; then \
-        BRANCH=release-15.0-rc1; \
-    elif [[ $FLINK_VERSION == *SNAPSHOT ]]; then \
-        BRANCH=master; \
-    else \
-        FLINK_MINOR_VERSION=$(echo $FLINK_VERSION | cut -d '.' -f 2,3); \
-        BRANCH=release-$FLINK_MINOR_VERSION; \
-    fi; \
     git clone \
         --depth 1 \
-        --branch $BRANCH \
+        --branch release-$FLINK_SHADED_VERSION \
         https://github.com/apache/flink-shaded.git $FLS_PATH; \
     cd $FLS_PATH; \
     for module in "netty-4" "netty-tcnative-static"; do \
-      mvn clean package \
+      mvn clean install \
           -Pinclude-netty-tcnative-static \
           -pl flink-shaded-$module; \
     done; \
@@ -164,8 +158,6 @@ RUN set -eux; \
           -DprotocExecutable=/usr/bin/protoc; \
       cd ..; \
       echo 'Flink built!'; \
-    else \
-      mkdir -p /flink && touch /flink/build-target; \
     fi;
 
 
@@ -231,7 +223,6 @@ FROM flink_base as flink_snapshot
 COPY --from=mvn_builder --chown=flink /flink/build-target $FLINK_HOME
 COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15-SNAPSHOT.jar /flink/opt
 COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15-SNAPSHOT.jar /flink/opt
-COPY --from=mvn_builder /flink/flink-python/target/flink-python_2.12-1.15-SNAPSHOT.jar /flink/opt
 
 
 # Stable version
