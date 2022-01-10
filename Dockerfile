@@ -221,7 +221,10 @@ CMD ["help"]
 FROM flink_base as flink_snapshot
 
 COPY --from=mvn_builder --chown=flink /flink/build-target $FLINK_HOME
+COPY --from=mvn_builder /flink/flink-connectors/flink-connector-jdbc/target/flink-connector-jdbc-1.15-SNAPSHOT.jar /flink/opt
 COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15-SNAPSHOT.jar /flink/opt
+COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15-SNAPSHOT.jar /flink/opt
+COPY --from=mvn_builder /flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15-SNAPSHOT.jar /flink/opt
 COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15-SNAPSHOT.jar /flink/opt
 
 
