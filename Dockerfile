@@ -20,11 +20,11 @@
 ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.13
 ARG BUILD_IMAGE=alpine:3.14
 
-ARG FLINK_VERSION=1.14.0
+ARG FLINK_VERSION=1.14.3
 ARG FLINK_SCALA_VERSION=2.12
 ARG FLINK_HOME=/flink
-ARG FLINK_SHA512HASH="b2895b4f3b905e03a2b394f7da089c70d7148a027fb350de440222e8e0326da9d8a22af8fbcaa705ba6faf81845b6dc3af9ec085325e948447713e86859fc759"
-ARG FLINK_MINOR_VERSION=14.0
+ARG FLINK_SHA512HASH="3798794f00928655d1179a230d3c94f9a9208c65a175d2a0e6517812d8c611bbd16601fcdf446458641d77113f3292b1745a8a577501eb45b99ca97a48e4231c"
+ARG FLINK_MINOR_VERSION=14.3
 ARG FLINK_COMMIT=
 
 ARG JEMALLOC_VERSION=5.2.1
@@ -76,6 +76,7 @@ ARG NETTY_JNI_UTIL_VERSION
 ARG FLINK_SHADED_VERSION
 ARG FLINK_VERSION
 ARG FLINK_SCALA_VERSION
+ARG FLINK_COMMIT
 
 
 COPY *.patch /
@@ -139,11 +140,11 @@ RUN set -eux; \
 RUN set -eux; \
     \
 # Build Flink if SNAPSHOT version
-    if [[ $FLINK_VERSION == *SNAPSHOT* ]]; then \
+    if [[ $FLINK_VERSION == "*SNAPSHOT*" ]]; then \
       git clone --depth 1 --branch master \
           https://github.com/apache/flink.git; \
       cd flink; \
-      [[ -z "$FLINK_COMMIT" ]] && git checkout $FLINK_COMMIT || true; \
+      [[ "$FLINK_COMMIT" ]] && git checkout $FLINK_COMMIT || true; \
       patch -p1 < /flink-$FLINK_VERSION.patch; \
       . build-vars.sh; cd ..; \
       \
