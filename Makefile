@@ -13,8 +13,11 @@ NAME=flink
 IMAGE=$(REGISTRY_HOST)/$(USERNAME)/$(NAME)
 DOCKER_BUILD_CONTEXT=.
 DOCKER_FILE_PATH=Dockerfile
-VERSION=$(or $(shell git tag -l --points-at HEAD), SNAPSHOT)
-MINOR_VERSION=$(shell echo $(VERSION) | cut -d '.' -f 2,3 | sed 's/-SNAPSHOT/.0/g')
+GIT_TAG=$(shell git tag -l --points-at HEAD)
+VERSION=$(or $(GIT_TAG), SNAPSHOT)
+MINOR_VERSION=$(shell echo $(VERSION) | cut -d '.' -f 2,3 | sed 's/-SNAPSHOT.*//g')
+DOCKER_BUILD_TARGET=$(if $(findstring SNAPSHOT, $(VERSION)),snapshot,stable)
+COMMIT=$(shell echo $(GIT_TAG) | cut -d '-' -f 3)
 
 
 # HELP
@@ -31,11 +34,15 @@ help: ## This help
 # DOCKER TASKS
 # Build the container
 build: ## Build the container
-	docker build $(shell ./get-dependencies.sh $(VERSION)) \
+	DOCKER_BUILDKIT=1 docker build \
+		-t $(IMAGE):$(VERSION) \
+		$(shell ./get-dependencies.sh $(VERSION)) \
+		--build-arg FLINK_COMMIT=$(COMMIT) \
 		--build-arg FLINK_VERSION=$(VERSION) $(DOCKER_BUILD_ARGS) \
 		--build-arg FLINK_MINOR_VERSION=$(MINOR_VERSION) \
-		--target flink_$(if $(findstring -SNAPSHOT, $(VERSION)),snapshot,stable) \
-		-t $(IMAGE):$(VERSION) $(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH)
+		--target flink_$(DOCKER_BUILD_TARGET) \
+		$(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH) \
+		--progress plain
 
 release: build push ## Make a release by building and pushing the `{version}` and `latest` tagged containers to Container Registry (CR)
 
