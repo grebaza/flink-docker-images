@@ -23,7 +23,7 @@ COMMIT=$(shell echo $(GIT_TAG) | cut -d '-' -f 3)
 # HELP
 # This will output the help for each task
 # thanks to https://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
-.PHONY: help
+.PHONY: help release build push clear-builder tag registry-login version
 
 help: ## This help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -31,12 +31,19 @@ help: ## This help
 .DEFAULT_GOAL := help
 
 
+release: build push ## Make a release by building and pushing the `{version}` and `latest` tagged containers to Container Registry (CR)
+
+
 # DOCKER TASKS
 # Build the container
 build: ## Build the container
-	DOCKER_BUILDKIT=1 docker build \
+	$(eval BUILDER := $(shell docker buildx create \
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 \
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=10000000))
+	docker buildx build --builder $(BUILDER)
 		-t $(IMAGE):$(VERSION) \
-		$(shell ./get-dependencies.sh $(VERSION)) \
+		-o type=docker \
+		$$(./get-dependencies.sh $(VERSION)) \
 		--build-arg FLINK_COMMIT=$(COMMIT) \
 		--build-arg FLINK_VERSION=$(VERSION) $(DOCKER_BUILD_ARGS) \
 		--build-arg FLINK_MINOR_VERSION=$(MINOR_VERSION) \
@@ -44,20 +51,27 @@ build: ## Build the container
 		$(DOCKER_BUILD_CONTEXT) -f $(DOCKER_FILE_PATH) \
 		--progress plain
 
-release: build push ## Make a release by building and pushing the `{version}` and `latest` tagged containers to Container Registry (CR)
-
 # Docker push
-push: registry-login tag ## Publish the `{version}` and `latest` tagged containers to CR
+push: registry-login ## Publish the `{version}` and `latest` tagged containers to CR
+	$(MAKE) tag
 	docker push $(IMAGE):$(VERSION)
+ifeq ($(DOCKER_BUILD_TARGET),stable)
 	docker push $(IMAGE):latest
+endif
+	$(MAKE) clear-builder
+
+# Clear builder instance
+clear-builder: ## Clear builder instance
+	docker buildx rm $(BUILDER)
 
 # Docker tagging
-tag: ## Generate container tags for the `{version}` and `latest` tags
+tag: ## Generate container tags for the `latest` tag
+ifeq ($(DOCKER_BUILD_TARGET),stable)
 	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+endif
 
 
 # HELPERS
-
 # Generate script to login to aws docker repo
 CMD_REPOLOGIN := "eval $$\( aws ecr"
 ifdef AWS_CLI_PROFILE
