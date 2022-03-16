@@ -40,7 +40,7 @@ build: ## Build the container
 	$(eval BUILDER := $(shell docker buildx create \
 		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 \
 		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=10000000))
-	docker buildx build --builder $(BUILDER)
+	docker buildx build --builder $(BUILDER) \
 		-t $(IMAGE):$(VERSION) \
 		-o type=docker \
 		$$(./get-dependencies.sh $(VERSION)) \

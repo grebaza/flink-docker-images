@@ -2,25 +2,3 @@
 +++ b/build-vars.sh
 @@ -0,0 +1 @@
 +export PROTOBUF_VERSION=3.17.3
---- a/flink-runtime-web/web-dashboard/package.json
-+++ b/flink-runtime-web/web-dashboard/package.json
-@@ -4,7 +4,7 @@
-   "scripts": {
-     "ng": "node node_modules/@angular/cli/bin/ng",
-     "start": "ng serve",
--    "build": "ng build --configuration production --base-href ./",
-+    "build": "ng build --configuration production --base-href ./flink",
-     "test": "ng test",
-     "lint": "eslint --cache src --ext .ts,.html && stylelint \"**/*.less\"",
-     "lint:fix": "eslint --fix --cache src --ext .ts,.html && stylelint \"**/*.less\" --fix",
---- a/flink-runtime-web/web-dashboard/src/app/app.config.ts
-+++ b/flink-runtime-web/web-dashboard/src/app/app.config.ts
-@@ -16,7 +16,7 @@
-  * limitations under the License.
-  */
- 
--export const BASE_URL = '.';
-+export const BASE_URL = '/flink';
- 
- export type ColorKey =
-   | 'TOTAL'
