@@ -25,7 +25,9 @@ VAR_PREFIX="${4:-}"
 iter=1
 while read -rd $'' line
 do
-  var_name="$VAR_PREFIX"$(echo "$line" | sed -r "s/([^=]*)=.*/\1/g" | tr [:lower:] [:upper:])"$VAR_SUFFIX"
+  var_name="$VAR_PREFIX$(echo "$line" \
+    | sed -r "s/([^=]*)=.*/\1/g" \
+    | tr '[:lower:]' '[:upper:]')$VAR_SUFFIX"
   var_value=$(echo "$line" | sed -r "s/([^=]*)=(.*)$/\2/g")
   if [[ $iter == 1 ]]; then sep=''; else sep=' '; fi
   printf "%s $var_name=$var_value" "${sep}--build-arg"

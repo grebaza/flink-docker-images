@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-
-###############################################################################
-#  Licensed to the Apache Software Foundation (ASF) under one
-#  or more contributor license agreements.  See the NOTICE file
-#  distributed with this work for additional information
-#  regarding copyright ownership.  The ASF licenses this file
-#  to you under the Apache License, Version 2.0 (the
-#  "License"); you may not use this file except in compliance
-#  with the License.  You may obtain a copy of the License at
 #
-#      http://www.apache.org/licenses/LICENSE-2.0
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
 #
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
 # limitations under the License.
-###############################################################################
+#
 
 COMMAND_STANDALONE="standalone-job"
 COMMAND_HISTORY_SERVER="history-server"
@@ -43,6 +41,7 @@ get_jemalloc_path() {
   echo "$LJEMALLOC_PATH"
 }
 
+# Drop privileges
 drop_privs_cmd() {
   if [ "$(id -u)" != 0 ]; then
       # Don't need to drop privs if EUID != 0
@@ -77,18 +76,21 @@ copy_plugins_if_required() {
   done
 }
 
+# Update config file
 set_config_option() {
   local option=$1
   local value=$2
+  local conf_file=$3
+  local escaped_option
 
   # escape periods for usage in regular expressions
-  local escaped_option=$(echo "${option}" | sed -e "s/\./\\\./g")
+  escaped_option="${escaped_option//./\\.}"
 
   # either override an existing entry, or append a new one
-  if grep -E "^${escaped_option}:.*" "${CONF_FILE}" > /dev/null; then
-        sed -i -e "s/${escaped_option}:.*/$option: $value/g" "${CONF_FILE}"
+  if grep -E "^${escaped_option}:.*" "${conf_file}" > /dev/null; then
+    sed -i -e "s/${escaped_option}:.*/$option: $value/g" "${conf_file}"
   else
-        echo "${option}: ${value}" >> "${CONF_FILE}"
+    echo "${option}: ${value}" >> "${conf_file}"
   fi
 }
 
@@ -105,14 +107,14 @@ prepare_configuration() {
       echo "${FLINK_PROPERTIES}" >> "${CONF_FILE}"
   fi
   envsubst < "${CONF_FILE}" > "${CONF_FILE}.tmp" \
-    && mv "${CONF_FILE}.tmp" "${CONF_FILE}"
+    && mv -f "${CONF_FILE}.tmp" "${CONF_FILE}"
 }
 
 maybe_enable_jemalloc() {
   local LJEMALLOC_PATH
   if [ "${DISABLE_JEMALLOC:-false}" == "false" ]; then
     LJEMALLOC_PATH=$(get_jemalloc_path)
-    if [ -n $LJEMALLOC_PATH ]; then
+    if [[ -n "$LJEMALLOC_PATH" ]]; then
       echo "Setting LD_PRELOAD to $LJEMALLOC_PATH..."
       export LD_PRELOAD="$LD_PRELOAD:$LJEMALLOC_PATH"
     fi

@@ -1,0 +1,4 @@
+--- /dev/null
++++ b/build-vars.sh
+@@ -0,0 +1 @@
++export PROTOBUF_VERSION=3.17.3
