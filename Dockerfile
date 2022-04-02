@@ -39,6 +39,7 @@ ARG FLS_PATH=/flink-shaded
 ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_SHADED_VERSION.jar
 ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_SHADED_VERSION.jar
 
+ARG PKG_BIN_DIR=/flink/whl
 
 ######################################################################
 # STAGE: JeMalloc build
@@ -90,6 +91,7 @@ RUN set -eux; \
     \
     apk add --no-cache \
       sed grep findutils bash zip unzip zstd snappy-dev \
+      xz ccache utf8proc \
       autoconf automake g++ gfortran git cmake make linux-headers samurai pkgconf \
       alpine-sdk libtool \
       libunwind-dev libunwind-static libexecinfo-dev \
@@ -217,9 +219,6 @@ RUN --mount=type=cache,target=/root/.m2 \
       boost-atomic=1.72.0-r6 \
       boost=1.72.0-r6; \
     \
-    apk add xz ccache utf8proc; \
-    \
-    python3 --version; \
     python3 -m ensurepip --upgrade; \
     pip3 --no-cache-dir install -U pip setuptools wheel cython; \
     \
@@ -236,12 +235,13 @@ RUN --mount=type=cache,target=/root/.m2 \
     cd flink/flink-python; \
     CXXFLAGS="-O2 -g0" CMAKE_GENERATOR=Ninja NPY_DISTUTILS_APPEND_FLAGS=1 \
     pip3 install -r dev/dev-requirements.txt; \
-    python3 setup.py -q build sdist bdist_wheel; \
-    python3 setup.py -q build bdist bdist_wheel; \
+    pip3 install build; \
+    python3 -m build --wheel -o /tmp; \
+    cd apache-flink-libraries; \
+    python3 -m build --wheel --sdist -o /tmp; \
     \
     mkdir -p /flink-whl; \
     mv /tmp/*.whl /flink-whl; \
-    mv dist/*.whl /flink-whl; \
     find "$HOME/.cache/" -name '*.whl' -type f \
       -exec mv {} "/flink-whl" \;
 
@@ -250,7 +250,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Python wheels image
 ######################################################################
 FROM ${BUILD_IMAGE} as flink_wheels
-ARG PKG_BIN_DIR=/flink/whl
+ARG PKG_BIN_DIR
 COPY --from=mvn_builder /flink-whl/*.whl $PKG_BIN_DIR/
 
 
