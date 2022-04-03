@@ -16,6 +16,8 @@
 # limitations under the License.
 #
 
+set -e
+
 pip_upgrade() {
   pip3 install \
     --no-cache-dir \
@@ -88,4 +90,17 @@ bazel_install() {
   # restoring compiler flags
   if [ -n "${CFLAGS+x}" ]; then CFLAGS=$ORIG_CFLAGS; fi
   if [ -n "${CXXFLAGS+x}" ]; then CXXFLAGS=$ORIG_CXXFLAGS; fi
+}
+
+git_clone_sha() {
+  local repo=$1
+  local sha=$2
+  local dest_dir="${3:-$(basename -s .git "$repo")}"
+
+  echo "cloning $repo into $dest_dir for sha: $sha..."
+  git init -q "$dest_dir"
+  cd "$dest_dir"
+  git remote add origin "$repo"
+  git fetch --depth=1 origin "$sha"
+  git reset --hard FETCH_HEAD
 }

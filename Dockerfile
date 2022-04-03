@@ -157,15 +157,15 @@ RUN --mount=type=cache,target=/root/.m2 set -eux; \
     echo 'Flink Shaded Jars built!'
 
 # Build Flink (if SNAPSHOT version)
-COPY flink-*.patch /
-COPY protobuf-*.patch /
+COPY flink-*.patch protobuf-*.patch /
+COPY docker/libsetup.sh /scripts/
 RUN --mount=type=cache,target=/root/.m2 set -eux; \
     \
+    apk add --no-cache coreutils; \
     if [[ "$FLINK_VERSION" == "*SNAPSHOT*" ]]; then \
-      git clone \
-          https://github.com/apache/flink.git; \
+      bash -c 'source /scripts/libsetup.sh; \
+        git_clone_sha https://github.com/apache/flink.git '"$FLINK_COMMIT"; \
       cd flink; \
-      [[ "$FLINK_COMMIT" ]] && git checkout "$FLINK_COMMIT" || true; \
       patch -p1 < "/flink-$FLINK_VERSION.patch"; \
       . build-vars.sh; cd ..; \
       \
@@ -187,7 +187,7 @@ RUN --mount=type=cache,target=/root/.m2 set -eux; \
 
 # Build pyflink
 COPY docker/arrow-*.patch /scripts/
-COPY docker/build_pyarrow.sh docker/libsetup.sh /scripts/
+COPY docker/build_pyarrow.sh /scripts/
 RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=cache,target=/root/.cache/pip set -eux; \
     \
