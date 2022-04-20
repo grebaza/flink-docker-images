@@ -30,7 +30,3 @@
                        <env key="LDFLAGS" value="-Wl,--no-as-needed -lrt" />
                        <env key="LIB_NAME" value="${nativeLibName}" />
                        <!-- support for __attribute__((weak_import)) by the linker was added in 10.2 so ensure we
---- /dev/null
-+++ b/build-vars.sh
-@@ -0,0 +1 @@
-+export NETTY_NATIVE_PROFILE=uber-snapshot

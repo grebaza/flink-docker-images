@@ -18,10 +18,94 @@
 
 set -e
 
+# Color definitions
+# shellcheck disable=SC2034
+
+# Log functions ==============================================================
+log_level_1(){
+    echo -e "${YELLOW}${1}${NC}"
+}
+log_level_2(){
+    echo -e "${GREEN}${1}${NC}"
+}
+log_level_3(){
+    echo -e "${CYAN}${1}${NC}"
+}
+info() {
+  [ -n "$quiet" ] && return 0
+  local prompt="$GREEN>>>${NORMAL}"
+  printf "${prompt} %s\n" "$1" >&2
+}
+info2() {
+  [ -n "$quiet" ] && return 0
+  #      ">>> %s"
+  printf "    %s\n" "$1" >&2
+}
+warning() {
+  local prompt="${YELLOW}>>> WARNING:${NORMAL}"
+  printf "${prompt} %s\n" "$1" >&2
+}
+warning2() {
+  #      ">>> WARNING: %s\n"
+  printf "             %s\n" "$1" >&2
+}
+error() {
+  local prompt="${RED}>>> ERROR:${NORMAL}"
+  printf "${prompt} %s\n" "$1" >&2
+}
+error2() {
+  #      ">>> ERROR:
+  printf "           %s\n" "$1" >&2
+}
+log_debug() {
+  [ -z "$DEBUG" ] && return 0
+  local prompt="$GREEN>>>${NORMAL}"
+  printf "${prompt} %s\n" "$1" >&2
+}
+set_xterm_title() {
+  if [ "$TERM" = xterm ] && [ -n "$USE_COLORS" ]; then
+    # shellcheck disable=SC2059
+    printf "\033]0;$1\007" >&2
+  fi
+}
+
+disable_colors() {
+  NC=""
+  NORMAL=""
+  STRONG=""
+  RED=""
+  GREEN=""
+  YELLOW=""
+  BLUE=""
+  CYAN=""
+}
+
+enable_colors() {
+  # shellcheck disable=SC2034
+  NC="\033[0m"
+  # shellcheck disable=SC2034
+  NORMAL="\033[1;0m"
+  # shellcheck disable=SC2034
+  STRONG="\033[1;1m"
+  # shellcheck disable=SC2034
+  RED='\033[0;31m'
+  # RED="\033[1;31m"
+  # shellcheck disable=SC2034
+  GREEN='\033[0;32m'
+  # GREEN="\033[1;32m"
+  # shellcheck disable=SC2034
+  YELLOW="\033[1;33m"
+  # shellcheck disable=SC2034
+  BLUE="\033[1;34m"
+  # shellcheck disable=SC2034
+  CYAN='\033[0;36m'
+}
+
 pip_upgrade() {
-  pip3 install \
+  python3 -m ensurepip --upgrade
+  python3 -m pip install \
     --no-cache-dir \
-    --upgrade pip setuptools wheel cython
+    --upgrade setuptools wheel cython
 }
 
 lineinfile() {
@@ -104,3 +188,34 @@ git_clone_sha() {
   git fetch --depth=1 origin "$sha"
   git reset --hard FETCH_HEAD
 }
+
+install_maven() {
+  local src_dir="${1:-$(pwd)}"
+  local version="${2:-3.8.5}"
+  local file="${3:-APKBUILD-maven}"
+
+  mkdir -p "$src_dir"
+
+  # change version
+  pushd "$src_dir"
+  sed -iE 's/^pkgver=(.*)$/pkgver='"$version"'/g' "$file"
+
+  # build and install
+  ln -sf "$file" APKBUILD
+  abuild-keygen -na
+  abuild -F
+  local apk_file=~/packages/x86_64/maven-"$version"-r0.apk
+  apk add --allow-untrusted "$apk_file"
+  rm "$apk_file"
+  popd
+}
+
+is_function() {
+  type "$1" 2>&1 | head -n 1 | grep -Eq "is a (shell )?function"
+}
+
+shell_escape() {
+  echo \'"${1/\'/\'\\\'\'}"\'
+}
+
+enable_colors

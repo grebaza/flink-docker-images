@@ -17,32 +17,34 @@
 ###############################################################################
 
 
-ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.13
+ARG PY_VER=3.8.12-alpine
 ARG BUILD_IMAGE=alpine:3.15.3
+ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.13
 
-ARG FLINK_VERSION=1.14.3
-ARG FLINK_SCALA_VERSION=2.12
+ARG FLINK_VERSION=flink-1.14.0
 ARG FLINK_HOME=/flink
 ARG FLINK_SHA512HASH="3798794f00928655d1179a230d3c94f9a9208c65a175d2a0e6517812d8c611bbd16601fcdf446458641d77113f3292b1745a8a577501eb45b99ca97a48e4231c"
-ARG FLINK_MINOR_VERSION=14.3
-ARG FLINK_COMMIT=
+
+ARG PKG_OUT_DIR=/flink/whl
+ARG PATCH_DIR=/patch
+ARG BUILD_ROOT=/build
 
 ARG JEMALLOC_VERSION=5.2.1
+
+# to delete
 ARG TCNATIVE_VERSION=2.0.39.Final
 ARG NETTY_VERSION=4.1.65.Final
-ARG NETTY_JNI_UTIL_VERSION=0.0.3.Final
 ARG FLINK_SHADED_VERSION=14.0
-
 ARG FLS_TCNATIVE=flink-shaded-netty-tcnative-static
 ARG FLS_NETTYALL=flink-shaded-netty
 ARG FLS_PATH=/flink-shaded
 ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_SHADED_VERSION.jar
 ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_SHADED_VERSION.jar
 
-ARG PKG_BIN_DIR=/flink/whl
+
 
 ######################################################################
-# STAGE: JeMalloc build
+# STAGE: JeMalloc build TODO: move into mvn_builder stage
 ######################################################################
 FROM ${BUILD_IMAGE} as builder
 ARG JEMALLOC_VERSION
@@ -76,182 +78,72 @@ RUN set -eux; \
 ######################################################################
 # STAGE: Maven build
 ######################################################################
-FROM ${JDK_IMAGE} as mvn_builder
-ARG FLS_PATH
-ARG NETTY_VERSION
-ARG TCNATIVE_VERSION
-ARG NETTY_JNI_UTIL_VERSION
-ARG FLINK_SHADED_VERSION
+FROM python:${PY_VER} AS mvn_builder
 ARG FLINK_VERSION
-ARG FLINK_SCALA_VERSION
-ARG FLINK_COMMIT
+ARG PATCH_DIR
+ARG BUILD_ROOT
+ARG PKG_OUT_DIR
 
-
+COPY docker/libsetup.sh /scripts/
+COPY docker/APKBUILD-maven /mvn/
 RUN set -eux; \
     \
     apk add --no-cache \
-      sed grep findutils bash zip unzip zstd snappy-dev \
-      xz ccache utf8proc \
+      patch sed grep coreutils findutils bash zip zstd xz curl rsync jq \
       autoconf automake g++ gfortran git cmake make linux-headers samurai pkgconf \
-      alpine-sdk libtool \
-      libunwind-dev libunwind-static libexecinfo-dev \
-      openssl-dev openssl-libs-static libffi-dev apr-dev \
+      go flex bison ccache alpine-sdk libtool utf8proc \
+      bsd-compat-headers libtirpc-dev \
+      libexecinfo-dev libaio-dev libffi-dev \
+      openssl-dev openssl-libs-static apr-dev \
       openblas-dev fftw-dev gmp-dev mpfr-dev \
-      openmpi-dev libtbb-dev zlib-dev zstd-dev \
-      go \
-      maven
+      openmpi-dev libtbb-dev zlib-dev zstd-dev snappy-dev protobuf-dev; \
+    \
+    bash -c '. /scripts/libsetup.sh; apk_add_repos; apk_add_repo_azul'; \
+    bash -c '. /scripts/libsetup.sh; install_maven /mvn 3.8.5'; \
+    apk add --no-cache \
+        zulu11-jdk; \
+    rm -rf /var/cache/apk/*
 
-# Build Flink's dependencies
-COPY netty-*.patch /
+# Build Flink
+WORKDIR $BUILD_ROOT
+COPY docker/install_pkg.sh docker/foreach_requirement.sh /scripts/
+COPY packages.json docker/PKBUILD-protoc $BUILD_ROOT/
+COPY patch/netty-*.patch patch/protobuf-*.patch $PATCH_DIR/
 RUN --mount=type=cache,target=/root/.m2 set -eux; \
     \
-# Build Netty and Tcnative dependents (jni-util, build-common)
-    git clone \
-        --depth 1 \
-        --branch "netty-jni-util-$NETTY_JNI_UTIL_VERSION" \
-        -c advice.detachedHead=false \
-        https://github.com/netty/netty-jni-util.git; \
-    cd netty-jni-util; \
-    mvn clean install; \
-    cd ..; \
-    \
-# Build Netty (for use in flink-shaded-netty-4)
-    git clone \
-        --depth 1 \
-        --branch "netty-$NETTY_VERSION" \
-        -c advice.detachedHead=false \
-        https://github.com/netty/netty.git; \
-    cd netty; \
-    patch -p1 < "/netty-$NETTY_VERSION.patch"; \
-    . build-vars.sh; \
-    mvn -am -pl transport-native-unix-common,transport-native-kqueue,transport-native-epoll \
-        clean install -DskipTests=true; \
-    mvn -P"full,$NETTY_NATIVE_PROFILE" -pl all clean install; \
-    cd ..; \
-    \
-# Build Tcnative as uber jar
-    git clone \
-        --depth 1 \
-        --branch "netty-tcnative-parent-$TCNATIVE_VERSION" \
-        -c advice.detachedHead=false \
-        https://github.com/netty/netty-tcnative.git; \
-    cd netty-tcnative; \
-    for profile in "boringssl-static-default" "uber-snapshot"; do \
-      mvn clean install -P"$profile" -pl boringssl-static; \
-    done; \
-    cd ..; \
-    \
-# Build Flink shaded for Netty ant Tcnative
-    git clone \
-        --depth 1 \
-        --branch "release-$FLINK_SHADED_VERSION" \
-        -c advice.detachedHead=false \
-        https://github.com/apache/flink-shaded.git "$FLS_PATH"; \
-    cd "$FLS_PATH"; \
-    for module in "netty-4" "netty-tcnative-static"; do \
-      mvn clean install \
-          -Pinclude-netty-tcnative-static \
-          -pl "flink-shaded-$module"; \
-    done; \
-    cd ..; \
-    echo 'Flink Shaded Jars built!'
+    export JAVA_HOME=/usr/lib/jvm/default-jvm; \
+    PATCH_DIR=$PATCH_DIR \
+    PKG_OUT_DIR=$PKG_OUT_DIR \
+    REQUIREMENTS_PROJECT=flink-$FLINK_VERSION \
+    REQUIREMENTS_FOREACH=/scripts/install_pkg.sh \
+    /scripts/foreach_requirement.sh; \
+    echo 'Flink built'
 
-# Build Flink (if SNAPSHOT version)
-COPY flink-*.patch protobuf-*.patch /
-COPY docker/libsetup.sh /scripts/
-RUN --mount=type=cache,target=/root/.m2 set -eux; \
-    \
-    apk add --no-cache coreutils; \
-    if [[ "$FLINK_VERSION" == "*SNAPSHOT*" ]]; then \
-      bash -c 'source /scripts/libsetup.sh; \
-        git_clone_sha https://github.com/apache/flink.git '"$FLINK_COMMIT"; \
-      cd flink; \
-      patch -p1 < "/flink-$FLINK_VERSION.patch"; \
-      . build-vars.sh; cd ..; \
-      \
-      git clone --depth 1 --branch "v$PROTOBUF_VERSION" \
-          -c advice.detachedHead=false \
-          https://github.com/google/protobuf.git; \
-      cd protobuf; \
-      patch -p1 < "/protobuf-$PROTOBUF_VERSION.patch"; \
-      ./autogen.sh; cd protoc-artifacts && mvn install; \
-      . build-vars.sh; cp "$PROTOBUF_FILE" /usr/bin/protoc; \
-      cd ../../flink; \
-      \
-      mvn clean package -D"scala-$FLINK_SCALA_VERSION" -DskipTests \
-          -DprotocCommand=/usr/bin/protoc \
-          -DprotocExecutable=/usr/bin/protoc; \
-      cd ..; \
-      echo 'Flink built!'; \
-    fi;
-
-# Build pyflink
-COPY docker/arrow-*.patch /scripts/
-COPY docker/build_pyarrow.sh /scripts/
+# Build Pyflink
+COPY docker/arrow-*.patch $PATCH_DIR/
+COPY docker/PKBUILD-pyarrow docker/PKBUILD-pyflink $BUILD_ROOT/
 RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=cache,target=/root/.cache/pip set -eux; \
     \
     apk add --no-cache \
-      --repository=http://dl-cdn.alpinelinux.org/alpine/v3.13/main \
-      python3=3.8.10-r0 python3-dev=3.8.10-r0; \
-    apk add --no-cache \
-      --repository=http://dl-cdn.alpinelinux.org/alpine/v3.13/main \
-      boost-dev=1.72.0-r6 \
-      boost-libs=1.72.0-r6 \
-      boost-chrono=1.72.0-r6 \
-      boost-container=1.72.0-r6 \
-      boost-context=1.72.0-r6 \
-      boost-contract=1.72.0-r6 \
-      boost-coroutine=1.72.0-r6 \
-      boost-date_time=1.72.0-r6 boost-fiber=1.72.0-r6 \
-      boost-filesystem=1.72.0-r6 \
-      boost-graph=1.72.0-r6 \
-      boost-iostreams=1.72.0-r6 boost-locale=1.72.0-r6 \
-      boost-log=1.72.0-r6 boost-log_setup=1.72.0-r6 \
-      boost-math=1.72.0-r6 boost-prg_exec_monitor=1.72.0-r6 \
-      boost-program_options=1.72.0-r6 boost-python3=1.72.0-r6 \
-      boost-random=1.72.0-r6 boost-regex=1.72.0-r6 \
-      boost-serialization=1.72.0-r6 boost-stacktrace_basic=1.72.0-r6 \
-      boost-stacktrace_noop=1.72.0-r6 boost-system=1.72.0-r6 \
-      boost-thread=1.72.0-r6 boost-timer=1.72.0-r6 \
-      boost-type_erasure=1.72.0-r6 boost-unit_test_framework=1.72.0-r6 \
-      boost-wave=1.72.0-r6 boost-wserialization=1.72.0-r6 \
-      boost-atomic=1.72.0-r6 \
-      boost=1.72.0-r6; \
+      python3-dev \
+      boost; \
     \
-    python3 -m ensurepip --upgrade; \
-    pip3 --no-cache-dir install -U pip setuptools wheel cython; \
-    \
-    pip3 install numpy==1.19.5; \
-    \
-    export PIP_FIND_LINKS="/tmp"; \
-    ARROW_VERSION=2.0.0 \
-    NUMPY_VERSION=1.19.5 \
-    NO_INSTALL_BUILD_TOOLS=true \
-    ARROW_VERBOSE_THIRDPARTY_BUILD=ON \
-    WHEEL_DIR="$PIP_FIND_LINKS" \
-    scripts/build_pyarrow.sh; \
-    \
-    cd flink/flink-python; \
-    CXXFLAGS="-O2 -g0" CMAKE_GENERATOR=Ninja NPY_DISTUTILS_APPEND_FLAGS=1 \
-    pip3 install -r dev/dev-requirements.txt; \
-    pip3 install build; \
-    python3 -m build --wheel -o /tmp; \
-    cd apache-flink-libraries; \
-    python3 -m build --wheel --sdist -o /tmp; \
-    \
-    mkdir -p /flink-whl; \
-    mv /tmp/*.whl /flink-whl; \
-    find "$HOME/.cache/" -name '*.whl' -type f \
-      -exec mv {} "/flink-whl" \;
+    export JAVA_HOME=/usr/lib/jvm/default-jvm; \
+    PATCH_DIR=$PATCH_DIR \
+    PKG_OUT_DIR=$PKG_OUT_DIR \
+    REQUIREMENTS_PROJECT=pyflink-$FLINK_VERSION \
+    REQUIREMENTS_FOREACH=/scripts/install_pkg.sh \
+    /scripts/foreach_requirement.sh; \
+    echo 'Pyflink built'
 
 
 ######################################################################
-# Python wheels image
+# Python wheels image (for reusing in other projects)
 ######################################################################
 FROM ${BUILD_IMAGE} as flink_wheels
-ARG PKG_BIN_DIR
-COPY --from=mvn_builder /flink-whl/*.whl $PKG_BIN_DIR/
+ARG PKG_OUT_DIR
+COPY --from=mvn_builder $PKG_OUT_DIR/*.whl $PKG_OUT_DIR/
 
 
 ######################################################################
@@ -259,13 +151,11 @@ COPY --from=mvn_builder /flink-whl/*.whl $PKG_BIN_DIR/
 ######################################################################
 FROM ${JDK_IMAGE}-jre as flink_base
 ARG FLINK_VERSION
-ARG FLINK_MINOR_VERSION
 ARG FLINK_SCALA_VERSION
 ARG FLINK_HOME
 ARG FLINK_SHA512HASH
 ARG FLS_TCNATIVE_JAR
 ARG FLS_NETTYALL_JAR
-ARG TCNATIVE_VERSION
 
 ENV FLINK_VERSION=$FLINK_VERSION \
     SCALA_VERSION=$FLINK_SCALA_VERSION \
@@ -297,9 +187,9 @@ RUN set -eux; \
     addgroup -g 1001 -S flink; \
     adduser -G flink -u 1001 -s /bin/bash -h $FLINK_HOME -S -D flink;
 
-# Netty tcnative library
-COPY --from=mvn_builder $FLS_TCNATIVE_JAR $FLINK_HOME/lib/
-COPY --from=mvn_builder $FLS_NETTYALL_JAR $FLINK_HOME/lib/
+# Netty tcnative library (TODO)
+# COPY --from=mvn_builder $FLS_TCNATIVE_JAR $FLINK_HOME/lib/
+# COPY --from=mvn_builder $FLS_NETTYALL_JAR $FLINK_HOME/lib/
 
 USER flink
 
@@ -318,12 +208,12 @@ CMD ["help"]
 ######################################################################
 FROM flink_base as flink_snapshot
 
-COPY --from=mvn_builder --chown=flink /flink/build-target $FLINK_HOME
-COPY --from=mvn_builder /flink/flink-connectors/flink-connector-jdbc/target/flink-connector-jdbc-1.15.0.jar /flink/opt
-COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15.0.jar /flink/opt
-COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15.0.jar /flink/opt
-COPY --from=mvn_builder /flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15.0.jar /flink/opt
-COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15.0.jar /flink/opt
+COPY --from=mvn_builder --chown=flink /$BUILD_ROOT/flink/build-target $FLINK_HOME
+# COPY --from=mvn_builder /flink/flink-connectors/flink-connector-jdbc/target/flink-connector-jdbc-1.15.0.jar /flink/opt
+# COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15.0.jar /flink/opt
+# COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15.0.jar /flink/opt
+# COPY --from=mvn_builder /flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15.0.jar /flink/opt
+# COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15.0.jar /flink/opt
 
 
 ######################################################################

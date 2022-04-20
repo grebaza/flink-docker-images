@@ -44,7 +44,9 @@ DOCKER_FILE_PATH=../Dockerfile
 GIT_TAG = $(or $(shell git tag -l --points-at HEAD),$(file < version.txt))
 COMMIT=$(shell echo $(GIT_TAG) | cut -d '-' -f 3-)
 BUILDER_FILE ?= .builder_name
-BUILDER_TARGET=flink_$(if $(findstring SNAPSHOT, $(IMAGE_VERSION)),snapshot,stable)
+BUILDER_TARGET=flink_$(if $(shell echo $(IMAGE_VERSION) \
+							 | sed -En '/^([0-9]+)\.([0-9]+)\.([0-9]+)$$/!q1' \
+							 && echo "true"),stable,snapshot)
 REGISTRY_HOSTNAME = $(call get_hostname, $(REGISTRY_HOST))
 
 # Choose build system
@@ -77,8 +79,8 @@ ifeq ($(USE_BUILDX),1)
 		--config buildkitd.toml \
 		--driver docker-container \
 		--driver-opt network=host \
-		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 \
-		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=10000000)))
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=12000000 \
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=12000000)))
 	$(file > $(BUILDER_FILE),$(BUILDER))
 	$(eval BUILDER_CMD := docker buildx build --builder $(BUILDER) \
 		-o type=image,name=$(IMAGE):$(IMAGE_VERSION),push=true)
@@ -92,12 +94,9 @@ endif
 		$(if $(BUILDER_TARGET),--target $(BUILDER_TARGET)) \
 		--progress plain \
 		--ssh default=$(HOME)/.ssh/id_ed25519 \
-		$$(./get-dependencies.sh $(IMAGE_VERSION) ../packages.json) \
-		--build-arg FLINK_COMMIT=$(COMMIT) \
 		--build-arg FLINK_VERSION=$(IMAGE_VERSION) \
-		--build-arg FLINK_MINOR_VERSION=$(call get_minor_version, $(IMAGE_VERSION)) \
 		--add-host=dbms:$(call get_host_ip, dbms) \
-		--add-host=remote-cache:$(call get_cntr_bridge_ip) \
+		--add-host=remote-cache:$(call get_host_ip, promise) \
 		--cache-from=type=registry,ref=$(IMAGE_BUILD_CACHE) \
 		$(BUILDER_CACHE_ARGS) \
 		$(DOCKER_BUILD_CONTEXT)

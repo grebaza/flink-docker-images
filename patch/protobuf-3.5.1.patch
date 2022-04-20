@@ -21,7 +21,3 @@
    ret=$?
    if [[ $ret == 0 ]]; then
      fail "found unexpected dependencies (listed above)."
---- /dev/null
-+++ b/protoc-artifacts/build-vars.sh
-@@ -0,0 +1 @@
-+export PROTOBUF_FILE=target/protoc.exe

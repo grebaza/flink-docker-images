@@ -1,0 +1,31 @@
+# Contributor: Guillermo Rebaza <grebaza@gmail.com>
+pkgname=pyflink
+pkgver="1.15.0-rc3"
+_pkgname="$pkgname-${pkgver%%.*}"
+pkgrel=0
+pkgdesc="Apache Flink is an open-source, unified stream-processing and batch-processing framework developed by the Apache Software Foundation."
+url="https://github.com/apache/flink.git"
+# mips64 and riscv64 blocked by java-jdk
+arch="noarch !mips65 !riscv64"
+license="Apache-2.0"
+source="https://github.com/apache/flink/archive/refs/tags/release-$pkgver.tar.gz"
+builddir="$PROJECT_SRC_DIR/apache-$pkgname-$pkgver"
+
+package() {
+  cd flink/flink-python
+  CXXFLAGS="-O2 -g0" CMAKE_GENERATOR=Ninja NPY_DISTUTILS_APPEND_FLAGS=1 \
+  python3 -m pip install -r dev/dev-requirements.txt
+
+  python3 -m build --wheel -o "$PKG_OUT_DIR"
+
+  cd apache-flink-libraries
+  python3 -m build --wheel --sdist -o "$PKG_OUT_DIR"
+}
+
+install() {
+:
+}
+
+sha512sums="
+89ab8ece99292476447ef6a6800d9842bbb60787b9b8a45c103aa61d2f205a971d8c3ddfb8b03e514455b4173602bd015e82958c0b3ddc1728a57126f773c743  apache-maven-3.8.5-bin.tar.gz
+"

@@ -1,44 +1,193 @@
 {
-  "1.14.0": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.39.Final",
-    "netty": "4.1.65.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "14.0"
+  "flink-1.14.0": {
+    "project_repotag_type": "tag",
+    "build_deps": [
+      {
+      "jemalloc": "5.2.1",
+      "tcnative": "2.0.39.Final",
+      "netty": "4.1.65.Final",
+      "netty_jni_util": "0.0.3.Final",
+      "flink_shaded": "14.0"
+      }
+    ]
   },
-  "1.15-SNAPSHOT-e615106": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.39.Final",
-    "netty": "4.1.65.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "14.0"
+  "flink-e615106": {
+    "project_repotag_type": "commit",
+    "build_deps": [
+      {
+      "jemalloc": "5.2.1",
+      "tcnative": "2.0.39.Final",
+      "netty": "4.1.65.Final",
+      "netty_jni_util": "0.0.3.Final",
+      "flink_shaded": "14.0"
+      }
+    ]
   },
-  "1.15-SNAPSHOT-6b17d31": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.44.Final",
-    "netty": "4.1.70.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "15.0"
+  "flink-6b17d31": {
+    "project_repotag_type": "commit",
+    "build_deps": [
+      {
+      "jemalloc": "5.2.1",
+      "tcnative": "2.0.44.Final",
+      "netty": "4.1.70.Final",
+      "netty_jni_util": "0.0.3.Final",
+      "flink_shaded": "15.0"
+      }
+    ]
   },
-  "1.15-SNAPSHOT-release-1.15.0-rc0": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.44.Final",
-    "netty": "4.1.70.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "15.0"
+  "flink-29d356a": {
+    "project_repotag_type": "commit",
+    "build_deps": [
+      {
+      "jemalloc": "5.2.1",
+      "tcnative": "2.0.44.Final",
+      "netty": "4.1.70.Final",
+      "netty_jni_util": "0.0.3.Final",
+      "flink_shaded": "15.0"
+      }
+    ]
   },
-  "1.15-SNAPSHOT-29d356a": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.44.Final",
-    "netty": "4.1.70.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "15.0"
+  "flink-master": {
+    "project_repotag_type": "branch",
+    "build_deps": [
+      {
+      "jemalloc": "5.2.1",
+      "tcnative": "2.0.44.Final",
+      "netty": "4.1.70.Final",
+      "netty_jni_util": "0.0.3.Final",
+      "flink_shaded": "15.0"
+      }
+    ]
   },
-  "1.15-SNAPSHOT": {
-    "jemalloc": "5.2.1",
-    "tcnative": "2.0.44.Final",
-    "netty": "4.1.70.Final",
-    "netty_jni_util": "0.0.3.Final",
-    "flink_shaded": "15.0"
+  "flink-1.15.0-rc3": {
+    "package": "org.apache.flink",
+    "package_version": "1.15.0-rc3",
+    "project_repo": "https://github.com/apache/flink.git",
+    "pkg_to_repotag_regex": ".*:(.*)",
+    "pkg_to_repotag_replacement": "release-\\1",
+    "package_builder": "maven",
+    "build_extra_args": "-DskipTests=true -Dscala-2.12 -DprotocCommand=/usr/bin/protoc -DprotocExecutable=/usr/bin/protoc",
+    "build_deps": [
+      {
+        "package": "io.netty:netty-transport-native-unix-common",
+        "package_version": "4.1.70.Final",
+        "project_repo": "https://github.com/netty/netty.git",
+        "subproject": "transport-native-unix-common",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-DskipTests=true"
+      },
+      {
+        "package": "io.netty:netty-transport-native-kqueue",
+        "package_version": "4.1.70.Final",
+        "project_repo": "https://github.com/netty/netty.git",
+        "subproject": "transport-native-kqueue",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-DskipTests=true"
+      },
+      {
+        "package": "io.netty:netty-transport-native-epoll",
+        "package_version": "4.1.70.Final",
+        "project_repo": "https://github.com/netty/netty.git",
+        "subproject": "transport-native-epoll",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-DskipTests=true"
+      },
+      {
+        "package": "io.netty:netty-all",
+        "package_version": "4.1.70.Final",
+        "project_repo": "https://github.com/netty/netty.git",
+        "subproject": "all",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-Pfull,native-dependencies -DskipTests=true"
+      },
+      {
+        "package": "io.netty:netty-jni-util",
+        "package_version": "0.0.3.Final",
+        "project_repo": "https://github.com/netty/netty-jni-util.git",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-jni-util-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-DskipTests=true"
+      },
+      {
+        "package": "io.netty:netty-tcnative-boringssl-static",
+        "package_version": "2.0.44.Final",
+        "project_repo": "https://github.com/netty/netty-tcnative.git",
+        "subproject": "boringssl-static",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-tcnative-parent-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-Pboringssl-static-default"
+      },
+      {
+        "package": "io.netty:netty-tcnative-boringssl-static",
+        "package_version": "2.0.44.Final",
+        "project_repo": "https://github.com/netty/netty-tcnative.git",
+        "subproject": "boringssl-static",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "netty-tcnative-parent-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-Puber-snapshot"
+      },
+      {
+        "package": "org.apache.flink:flink-shaded-netty",
+        "package_version": "4.1.70.Final-15.0",
+        "project_repo": "https://github.com/apache/flink-shaded.git",
+        "subproject": "flink-shaded-netty-4",
+        "pkg_to_repotag_regex": ".*:[^-]*-(.*)",
+        "pkg_to_repotag_replacement": "release-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-Pinclude-netty-tcnative-static"
+      },
+      {
+        "package": "org.apache.flink:flink-shaded-netty-tcnative-static",
+        "package_version": "15.0",
+        "project_repo": "https://github.com/apache/flink-shaded.git",
+        "subproject": "flink-shaded-netty-tcnative-static",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "release-\\1",
+        "package_builder": "maven",
+        "build_extra_args": "-Pinclude-netty-tcnative-static"
+      },
+      {
+        "package": "com.google.protobuf:protoc",
+        "package_version": "3.17.3",
+        "project_repo": "https://github.com/google/protobuf.git",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "v\\1",
+        "package_builder": "maven",
+        "project_root": "protoc-artifacts",
+        "package_script": "PKBUILD-protoc"
+      }
+    ]
+  },
+  "pyflink-1.15.0-rc3": {
+    "package": "org.apache.flink",
+    "package_version": "1.15.0-rc3",
+    "project_repo": "https://github.com/apache/flink.git",
+    "subproject": "flink-shaded-netty-tcnative-static",
+    "pkg_to_repotag_regex": ".*:(.*)",
+    "pkg_to_repotag_replacement": "release-\\1",
+    "package_builder": "maven",
+    "package_script": "PKBUILD-pyflink",
+    "build_deps": [
+      {
+        "package": "pyarrow",
+        "package_version": "2.0.0",
+        "project_repo": "https://github.com/apache/arrow.git",
+        "pkg_to_repotag_regex": ".*:(.*)",
+        "pkg_to_repotag_replacement": "apache-arrow-\\1",
+        "package_builder": "pip",
+        "package_script": "PKBUILD-pyarrow"
+      }
+    ]
   }
 }

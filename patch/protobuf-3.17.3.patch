@@ -115,7 +115,3 @@
                    <type>exe</type>
                  </artifact>
                </artifacts>
---- /dev/null
-+++ b/protoc-artifacts/build-vars.sh
-@@ -0,0 +1 @@
-+export PROTOBUF_FILE=target/linux/x86_64/protoc.exe
