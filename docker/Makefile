@@ -79,8 +79,8 @@ ifeq ($(USE_BUILDX),1)
 		--config buildkitd.toml \
 		--driver docker-container \
 		--driver-opt network=host \
-		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=12000000 \
-		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=12000000)))
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=14000000 \
+		--driver-opt env.BUILDKIT_STEP_LOG_MAX_SPEED=14000000)))
 	$(file > $(BUILDER_FILE),$(BUILDER))
 	$(eval BUILDER_CMD := docker buildx build --builder $(BUILDER) \
 		-o type=image,name=$(IMAGE):$(IMAGE_VERSION),push=true)
@@ -96,7 +96,7 @@ endif
 		--ssh default=$(HOME)/.ssh/id_ed25519 \
 		--build-arg FLINK_VERSION=$(IMAGE_VERSION) \
 		--add-host=dbms:$(call get_host_ip, dbms) \
-		--add-host=remote-cache:$(call get_host_ip, promise) \
+		--add-host=remote-cache:$(call get_cntr_bridge_ip) \
 		--cache-from=type=registry,ref=$(IMAGE_BUILD_CACHE) \
 		$(BUILDER_CACHE_ARGS) \
 		$(DOCKER_BUILD_CONTEXT)

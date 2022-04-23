@@ -12,9 +12,11 @@ source="https://github.com/apache/flink/archive/refs/tags/release-$pkgver.tar.gz
 builddir="$PROJECT_SRC_DIR/apache-$pkgname-$pkgver"
 
 package() {
-  cd flink/flink-python
+  cd flink-python
   CXXFLAGS="-O2 -g0" CMAKE_GENERATOR=Ninja NPY_DISTUTILS_APPEND_FLAGS=1 \
-  python3 -m pip install -r dev/dev-requirements.txt
+  python3 -m pip install \
+    --find-links "$PKG_OUT_DIR" \
+    -r dev/dev-requirements.txt
 
   python3 -m build --wheel -o "$PKG_OUT_DIR"
 

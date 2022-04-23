@@ -19,7 +19,7 @@
 
 ARG PY_VER=3.8.12-alpine
 ARG BUILD_IMAGE=alpine:3.15.3
-ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.13
+ARG JDK_IMAGE=azul/zulu-openjdk-alpine:11.0.15
 
 ARG FLINK_VERSION=flink-1.14.0
 ARG FLINK_HOME=/flink
@@ -30,17 +30,6 @@ ARG PATCH_DIR=/patch
 ARG BUILD_ROOT=/build
 
 ARG JEMALLOC_VERSION=5.2.1
-
-# to delete
-ARG TCNATIVE_VERSION=2.0.39.Final
-ARG NETTY_VERSION=4.1.65.Final
-ARG FLINK_SHADED_VERSION=14.0
-ARG FLS_TCNATIVE=flink-shaded-netty-tcnative-static
-ARG FLS_NETTYALL=flink-shaded-netty
-ARG FLS_PATH=/flink-shaded
-ARG FLS_TCNATIVE_JAR=$FLS_PATH/$FLS_TCNATIVE/target/$FLS_TCNATIVE-$TCNATIVE_VERSION-$FLINK_SHADED_VERSION.jar
-ARG FLS_NETTYALL_JAR=$FLS_PATH/$FLS_NETTYALL-4/target/$FLS_NETTYALL-$NETTY_VERSION-$FLINK_SHADED_VERSION.jar
-
 
 
 ######################################################################
@@ -126,8 +115,12 @@ RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=cache,target=/root/.cache/pip set -eux; \
     \
     apk add --no-cache \
-      python3-dev \
-      boost; \
+      libunwind-dev \
+      brotli-dev \
+      thrift-dev \
+      boost-dev; \
+    \
+    apk fix --reinstall protoc; \
     \
     export JAVA_HOME=/usr/lib/jvm/default-jvm; \
     PATCH_DIR=$PATCH_DIR \
@@ -151,18 +144,14 @@ COPY --from=mvn_builder $PKG_OUT_DIR/*.whl $PKG_OUT_DIR/
 ######################################################################
 FROM ${JDK_IMAGE}-jre as flink_base
 ARG FLINK_VERSION
-ARG FLINK_SCALA_VERSION
 ARG FLINK_HOME
 ARG FLINK_SHA512HASH
-ARG FLS_TCNATIVE_JAR
-ARG FLS_NETTYALL_JAR
 
 ENV FLINK_VERSION=$FLINK_VERSION \
-    SCALA_VERSION=$FLINK_SCALA_VERSION \
     FLINK_HOME=$FLINK_HOME \
     SHA512HASH=$FLINK_SHA512HASH
 
-ENV FLINK_URL_PATH=flink/flink-$FLINK_VERSION/flink-$FLINK_VERSION-bin-scala_$SCALA_VERSION.tgz
+ENV FLINK_URL_PATH=flink/flink-$FLINK_VERSION/flink-$FLINK_VERSION-bin-scala_2.12.tgz
 
 ENV PATH=$FLINK_HOME/bin:$PATH
 
@@ -176,18 +165,20 @@ RUN set -eux; \
     \
 # Install dependencies
     apk add --no-cache \
-      sed grep findutils gettext bash zlib zip zstd snappy \
-      curl su-exec \
-      libstdc++ libgcc libunwind libexecinfo \
+      patch sed grep coreutils findutils gettext bash zip zstd xz curl rsync jq \
+      su-exec \
+      libtirpc libstdc++ libgcc \
+      libunwind libexecinfo libaio libffi \
+      openssl \
       openblas fftw gmp mpfr \
-      openssl libffi \
-      openmpi libtbb; \
+      openmpi libtbb zlib zstd snappy protobuf \
+      brotli; \
     \
 # User and group creation
     addgroup -g 1001 -S flink; \
     adduser -G flink -u 1001 -s /bin/bash -h $FLINK_HOME -S -D flink;
 
-# Netty tcnative library (TODO)
+# Netty tcnative library (TODO: Review if necessary)
 # COPY --from=mvn_builder $FLS_TCNATIVE_JAR $FLINK_HOME/lib/
 # COPY --from=mvn_builder $FLS_NETTYALL_JAR $FLINK_HOME/lib/
 
@@ -207,13 +198,34 @@ CMD ["help"]
 # Final Snapshot image
 ######################################################################
 FROM flink_base as flink_snapshot
+ARG BUILD_ROOT
+ARG FLINK_HOME
+ARG FLINK_VERSION
 
-COPY --from=mvn_builder --chown=flink /$BUILD_ROOT/flink/build-target $FLINK_HOME
-# COPY --from=mvn_builder /flink/flink-connectors/flink-connector-jdbc/target/flink-connector-jdbc-1.15.0.jar /flink/opt
-# COPY --from=mvn_builder /flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15.0.jar /flink/opt
-# COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15.0.jar /flink/opt
-# COPY --from=mvn_builder /flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15.0.jar /flink/opt
-# COPY --from=mvn_builder /flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15.0.jar /flink/opt
+USER root
+COPY --from=mvn_builder --chown=flink $BUILD_ROOT/flink/build-target $FLINK_HOME
+COPY docker/xmltojson.py /scripts/
+COPY docker/copy_maven_package.sh /scripts/copy_maven_package
+RUN --mount=type=bind,target=/mvn_builder,from=mvn_builder set -eux; \
+    apk add --no-cache python3; \
+    python3 -m ensurepip --upgrade; \
+    python3 -m pip install xmltodict; \
+    \
+    export MVN_PROJECT_ROOT=/mvn_builder$BUILD_ROOT/flink; \
+    export PATH=$PATH:/scripts; \
+    copy_maven_package flink-formats/flink-sql-avro $FLINK_HOME/opt; \
+    copy_maven_package flink-formats/flink-sql-parquet $FLINK_HOME/opt; \
+    copy_maven_package flink-connectors/flink-sql-connector-kafka $FLINK_HOME/opt; \
+    copy_maven_package flink-formats/flink-sql-avro-confluent-registry $FLINK_HOME/opt; \
+    \
+    apk del --purge python3; \
+    rm -rf /var/cache/apk/*
+
+USER flink
+# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15.0.jar $FLINK_HOME/opt
+# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15.0.jar $FLINK_HOME/opt
+# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15.0.jar $FLINK_HOME/opt
+# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15.0.jar $FLINK_HOME/opt
 
 
 ######################################################################

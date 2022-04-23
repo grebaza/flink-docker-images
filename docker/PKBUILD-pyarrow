@@ -33,18 +33,20 @@ package() {
   if [ "$NO_INSTALL_ARROW_REQUIREMENTS" != "true" ]; then
     log_level_2 "Pip installing arrow requirements..."
     python3 -m pip install "numpy==1.19.5"
-    python3 -m pip install -r "$PROJECT_SRC_DIR/python/requirements-build.txt"
+    python3 -m pip install -r "python/requirements-build.txt"
   fi
 
   # build C++ library
   log_level_2 "Building Arrow C++ library..."
+  local srcdir
   local verbose_thirdparty_build
+  srcdir=$(pwd)
   verbose_thirdparty_build=ON
   mkdir -p "$builddir"
   cd "$builddir"
   cmake -GNinja \
         -DCMAKE_BUILD_TYPE=RELEASE \
-        -DCMAKE_INSTALL_PREFIX="$builddir/dist" \
+        -DCMAKE_INSTALL_PREFIX="$HOME/dist" \
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DARROW_CXXFLAGS="$CXXFLAGS" \
         -DARROW_WITH_BACKTRACE=ON \
@@ -60,7 +62,7 @@ package() {
         -DARROW_PLASMA=ON \
         -DARROW_USE_PRECOMPILED_HEADERS=ON \
         -DARROW_VERBOSE_THIRDPARTY_BUILD="$verbose_thirdparty_build" \
-        "$PROJECT_SRC_DIR/cpp"
+        "$srcdir/cpp"
 
   time cmake --build . --target install -- -j"${PARALLEL_WORKERS}"
 
@@ -73,15 +75,18 @@ package() {
   export PYARROW_WITH_PLASMA=1
   export PYARROW_WITH_FLIGHT=1
   export SETUPTOOLS_SCM_PRETEND_VERSION="$pkgver"
+  export ARROW_HOME="$HOME/dist"
 
   if [ "$NO_BUILD_PYARROW" != "true" ]; then
     log_level_2 "Building Pyarrow library..."
-    cd "$PROJECT_SRC_DIR/python"
+    cd "$srcdir/python"
     rm -rf build/  # remove any pre-existing build directory
+    python3 -m pip install --upgrade pip
+    python3 -m pip install build
     python3 -m build \
+      --outdir="$PKG_OUT_DIR" \
       --config-setting="--build-type=$PYARROW_BUILD_TYPE" \
-      --config-setting="--bundle-arrow-cpp" \
-      --outdir="$PKG_OUT_DIR"
+      --config-setting="--bundle-arrow-cpp"
   fi
 }
 
