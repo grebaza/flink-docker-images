@@ -138,6 +138,10 @@ FROM ${BUILD_IMAGE} as flink_wheels
 ARG PKG_OUT_DIR
 COPY --from=mvn_builder $PKG_OUT_DIR/*.whl $PKG_OUT_DIR/
 
+RUN --mount=type=bind,target=/mvn_builder,from=mvn_builder set -eux; \
+    find "/mvn_builder/root/.cache/" -name '*.whl' -type f \
+      -exec cp {} "$PKG_OUT_DIR/" \;
+
 
 ######################################################################
 # Final base image (base for snapshot and stable images)
