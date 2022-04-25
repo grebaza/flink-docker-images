@@ -39,6 +39,7 @@ ARG JEMALLOC_VERSION=5.2.1
 FROM ${BUILD_IMAGE} as builder
 ARG JEMALLOC_VERSION
 
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 # hadolint ignore=DL3018,DL3003
 RUN set -eux; \
     \
@@ -242,6 +243,8 @@ USER flink
 FROM flink_base as flink_stable
 
 USER root
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+# hadolint ignore=SC3010,DL4006
 RUN set -eux; \
     \
     if [[ "$FLINK_VERSION" != "*SNAPSHOT" ]]; then \
