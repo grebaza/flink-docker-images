@@ -28,7 +28,7 @@ DEST_DIR="$2"
 PKG_NAME="$(basename "$PKG_DIR")"
 
 pushd "$PKG_DIR"
-PKG_VERSION="$($SCRIPT_DIR/xmltojson.py pom.xml | jq -r '.project.parent.version')"
+PKG_VERSION="$("$SCRIPT_DIR"/xmltojson.py pom.xml | jq -r '.project.parent.version')"
 
 cp "$PKG_DIR/target/$PKG_NAME-$PKG_VERSION.jar" "$DEST_DIR"
 

@@ -35,9 +35,11 @@ ARG JEMALLOC_VERSION=5.2.1
 ######################################################################
 # STAGE: JeMalloc build TODO: move into mvn_builder stage
 ######################################################################
+# hadolint ignore=DL3006
 FROM ${BUILD_IMAGE} as builder
 ARG JEMALLOC_VERSION
 
+# hadolint ignore=DL3018,DL3003
 RUN set -eux; \
     \
     apk add --no-cache \
@@ -57,7 +59,7 @@ RUN set -eux; \
       --disable-prof-libgcc --disable-prof-gcc \
       --enable-static=no \
       --enable-shared=yes; \
-    make -j$(nproc); \
+    make -j"$(nproc)"; \
     # stress and check tests
     # make -j$(nproc) check stress; \
     make install; \
@@ -75,6 +77,7 @@ ARG PKG_OUT_DIR
 
 COPY docker/libsetup.sh /scripts/
 COPY docker/APKBUILD-maven /mvn/
+# hadolint ignore=DL3018
 RUN set -eux; \
     \
     apk add --no-cache \
@@ -111,6 +114,7 @@ RUN --mount=type=cache,target=/root/.m2 set -eux; \
 # Build Pyflink
 COPY docker/arrow-*.patch $PATCH_DIR/
 COPY docker/PKBUILD-pyarrow docker/PKBUILD-pyflink $BUILD_ROOT/
+# hadolint ignore=DL3018
 RUN --mount=type=cache,target=/root/.m2 \
     --mount=type=cache,target=/root/.cache/pip set -eux; \
     \
@@ -134,6 +138,7 @@ RUN --mount=type=cache,target=/root/.m2 \
 ######################################################################
 # Python wheels image (for reusing in other projects)
 ######################################################################
+# hadolint ignore=DL3006
 FROM ${BUILD_IMAGE} as flink_wheels
 ARG PKG_OUT_DIR
 COPY --from=mvn_builder $PKG_OUT_DIR/*.whl $PKG_OUT_DIR/
@@ -146,6 +151,7 @@ RUN --mount=type=cache,target=/root/.cache/pip set -eux; \
 ######################################################################
 # Final base image (base for snapshot and stable images)
 ######################################################################
+# hadolint ignore=DL3006
 FROM ${JDK_IMAGE}-jre as flink_base
 ARG FLINK_VERSION
 ARG FLINK_HOME
@@ -165,6 +171,7 @@ USER root
 COPY --from=builder /usr/lib/libjemalloc.so.2 /usr/lib/
 
 # Flink setup
+# hadolint ignore=DL3018
 RUN set -eux; \
     \
 # Install dependencies
@@ -210,13 +217,14 @@ USER root
 COPY --from=mvn_builder --chown=flink $BUILD_ROOT/flink/build-target $FLINK_HOME
 COPY docker/xmltojson.py /scripts/
 COPY docker/copy_maven_package.sh /scripts/copy_maven_package
+# hadolint ignore=DL3018
 RUN --mount=type=bind,target=/mvn_builder,from=mvn_builder set -eux; \
     apk add --no-cache python3; \
     python3 -m ensurepip --upgrade; \
-    python3 -m pip install xmltodict; \
+    python3 -m pip install --no-cache-dir xmltodict==0.12.0; \
     \
     export MVN_PROJECT_ROOT=/mvn_builder$BUILD_ROOT/flink; \
-    export PATH=$PATH:/scripts; \
+    export PATH="$PATH":/scripts; \
     copy_maven_package flink-formats/flink-sql-avro $FLINK_HOME/opt; \
     copy_maven_package flink-formats/flink-sql-parquet $FLINK_HOME/opt; \
     copy_maven_package flink-connectors/flink-sql-connector-kafka $FLINK_HOME/opt; \
@@ -226,10 +234,6 @@ RUN --mount=type=bind,target=/mvn_builder,from=mvn_builder set -eux; \
     rm -rf /var/cache/apk/*
 
 USER flink
-# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-avro/target/flink-sql-avro-1.15.0.jar $FLINK_HOME/opt
-# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-parquet/target/flink-sql-parquet-1.15.0.jar $FLINK_HOME/opt
-# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-connectors/flink-sql-connector-kafka/target/flink-sql-connector-kafka-1.15.0.jar $FLINK_HOME/opt
-# COPY --from=mvn_builder $BUILD_ROOT/flink/flink-formats/flink-sql-avro-confluent-registry/target/flink-sql-avro-confluent-registry-1.15.0.jar $FLINK_HOME/opt
 
 
 ######################################################################
