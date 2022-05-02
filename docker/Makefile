@@ -27,11 +27,11 @@ export $(shell sed 's/=.*//' $(dpl))
 endif
 
 # Helper functions and variables
-get_cntr_bridge_ip = $(shell docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' bridge)
-get_host_ip = $(shell getent hosts $(1) | cut -d ' ' -f1)
-get_hostname = $(shell echo $(1) | sed -E 's|([^:]+):(.*)$$|\1|g')
-get_minor_version = $(shell echo $(1) | cut -d '.' -f 2,3 | sed 's/-SNAPSHOT.*//g')
-if_undefined = $(if $(filter undefined,$(origin $1)),$2,$3)
+get_cntr_bridge_ip=$(shell docker network inspect --format '{{(index .IPAM.Config 0).Gateway}}' bridge)
+get_host_ip=$(shell getent hosts $(1) | cut -d ' ' -f1)
+get_hostname=$(shell echo $(1) | sed -E 's|([^:]+):(.*)$$|\1|g')
+get_minor_version=$(shell echo $(1) | cut -d '.' -f 2,3 | sed 's/-SNAPSHOT.*//g')
+if_undefined=$(if $(filter undefined,$(origin $1)),$2,$3)
 
 # Recipe vars
 NAME=flink
@@ -41,7 +41,7 @@ IMAGE_BUILD_CACHE=$(IMAGE)-build-cache
 IMAGE_VERSION=$(or $(GIT_TAG), SNAPSHOT)
 DOCKER_BUILD_CONTEXT=..
 DOCKER_FILE_PATH=../Dockerfile
-GIT_TAG = $(or $(shell git tag -l --points-at HEAD),$(file < version.txt))
+GIT_TAG=$(or $(shell git tag -l --points-at HEAD),$(file < version.txt))
 COMMIT=$(shell echo $(GIT_TAG) | cut -d '-' -f 3-)
 BUILDER_FILE ?= .builder_name
 BUILDER_TARGET=flink_$(if $(shell echo $(IMAGE_VERSION) \
@@ -140,7 +140,7 @@ ifdef AWS_CLI_PROFILE
 registry-login: registry-login-aws
 endif
 
-registry-login: ## Login to Docker Hub if  `{DOCKERHUB_USER}` and `{DOCKERHUB_TOKEN}` envvars are defined
+registry-login: ## Login to Docker Hub if `{DOCKERHUB_USER}` and `{DOCKERHUB_TOKEN}` envvars are defined
 ifneq ($(DOCKERHUB_TOKEN)$(DOCKERHUB_USER),)
 	docker logout
 	docker login --username $(DOCKERHUB_USER) --password $(DOCKERHUB_TOKEN)
