@@ -8,8 +8,7 @@ url="https://github.com/apache/arrow.git"
 # mips64 and riscv64 blocked by java-jdk
 arch="noarch !mips65 !riscv64"
 license="Apache-2.0"
-source="http://mirror.hosting90.cz/apache/maven/$_pkgname/$pkgver/binaries/apache-maven-$pkgver-bin.tar.gz"
-# builddir="$srcdir/apache-$pkgname-$pkgver"
+source="http://github.com/apache/arrow/archive/refs/tags/apache-arrow-$pkgver.tar.gz"
 builddir="$PROJECT_SRC_DIR/apache-$pkgname-$pkgver"
 
 fb_infer() {
@@ -32,7 +31,6 @@ package() {
   # install dependencies from Arrow Repo
   if [ "$NO_INSTALL_ARROW_REQUIREMENTS" != "true" ]; then
     log_level_2 "Pip installing arrow requirements..."
-    python3 -m pip install "numpy==1.19.5"
     python3 -m pip install -r "python/requirements-build.txt"
   fi
 
