@@ -1,7 +1,7 @@
 {
-  "flink-1.15.0-rc4": {
+  "flink-1.15.0": {
     "package": "org.apache.flink",
-    "package_version": "1.15.0-rc4",
+    "package_version": "1.15.0",
     "project_repo": "https://github.com/apache/flink.git",
     "pkg_to_repotag_regex": ".*:(.*)",
     "pkg_to_repotag_replacement": "release-\\1",
@@ -109,9 +109,9 @@
       }
     ]
   },
-  "pyflink-1.15.0-rc4": {
+  "pyflink-1.15.0": {
     "package": "org.apache.flink",
-    "package_version": "1.15.0-rc4",
+    "package_version": "1.15.0",
     "project_repo": "https://github.com/apache/flink.git",
     "subproject": "flink-shaded-netty-tcnative-static",
     "pkg_to_repotag_regex": ".*:(.*)",

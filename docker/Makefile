@@ -44,9 +44,9 @@ DOCKER_FILE_PATH=../Dockerfile
 GIT_TAG=$(or $(shell git tag -l --points-at HEAD),$(file < version.txt))
 COMMIT=$(shell echo $(GIT_TAG) | cut -d '-' -f 3-)
 BUILDER_FILE ?= .builder_name
-BUILDER_TARGET=flink_$(if $(shell echo $(IMAGE_VERSION) \
+BUILDER_TARGET=flink_$(if $(BUILD_FLINK),snapshot,$(if $(shell echo $(IMAGE_VERSION) \
 							 | sed -En '/^([0-9]+)\.([0-9]+)\.([0-9]+)$$/!q1' \
-							 && echo "true"),stable,snapshot)
+							 && echo "true"),stable))
 REGISTRY_HOSTNAME = $(call get_hostname, $(REGISTRY_HOST))
 
 # Choose build system

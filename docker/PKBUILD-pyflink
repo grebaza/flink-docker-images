@@ -1,6 +1,6 @@
 # Contributor: Guillermo Rebaza <grebaza@gmail.com>
 pkgname=pyflink
-pkgver="1.15.0-rc3"
+pkgver="1.15.0"
 _pkgname="$pkgname-${pkgver%%.*}"
 pkgrel=0
 pkgdesc="Apache Flink is an open-source, unified stream-processing and batch-processing framework developed by the Apache Software Foundation."
@@ -12,14 +12,15 @@ source="https://github.com/apache/flink/archive/refs/tags/release-$pkgver.tar.gz
 builddir="$PROJECT_SRC_DIR/apache-$pkgname-$pkgver"
 
 package() {
+  log_level_3 "flink-python"
   cd flink-python
   CXXFLAGS="-O2 -g0" CMAKE_GENERATOR=Ninja NPY_DISTUTILS_APPEND_FLAGS=1 \
   python3 -m pip install \
     --find-links "$PKG_OUT_DIR" \
     -r dev/dev-requirements.txt
-
   python3 -m build --wheel -o "$PKG_OUT_DIR"
 
+  log_level_3 "apache-flink-libraries"
   cd apache-flink-libraries
   python3 -m build --wheel --sdist -o "$PKG_OUT_DIR"
 }

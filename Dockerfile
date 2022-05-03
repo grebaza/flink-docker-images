@@ -105,6 +105,7 @@ COPY patch/netty-*.patch patch/protobuf-*.patch $PATCH_DIR/
 RUN --mount=type=cache,target=/root/.m2 set -eux; \
     \
     export JAVA_HOME=/usr/lib/jvm/default-jvm; \
+    NO_PKG_INSTALL=false \
     PATCH_DIR=$PATCH_DIR \
     PKG_OUT_DIR=$PKG_OUT_DIR \
     REQUIREMENTS_PROJECT=flink-$FLINK_VERSION \
@@ -113,7 +114,7 @@ RUN --mount=type=cache,target=/root/.m2 set -eux; \
     echo 'Flink built'
 
 # Build Pyflink
-COPY docker/arrow-*.patch $PATCH_DIR/
+COPY patch/arrow-*.patch $PATCH_DIR/
 COPY docker/PKBUILD-pyarrow docker/PKBUILD-pyflink $BUILD_ROOT/
 # hadolint ignore=DL3018
 RUN --mount=type=cache,target=/root/.m2 \
@@ -128,6 +129,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     apk fix --reinstall protoc; \
     \
     export JAVA_HOME=/usr/lib/jvm/default-jvm; \
+    NO_PKG_INSTALL=false \
     PATCH_DIR=$PATCH_DIR \
     PKG_OUT_DIR=$PKG_OUT_DIR \
     REQUIREMENTS_PROJECT=pyflink-$FLINK_VERSION \

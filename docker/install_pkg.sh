@@ -245,6 +245,7 @@ declare -A package_commands=(
 )
 package_pip(){
   mkdir -p "$PKG_OUT_DIR"
+  # shellcheck disable=SC2015
   [[ -f build.py || -d build ]] \
     && python3 setup.py bdist_wheel -d"$PKG_OUT_DIR" \
     || python3 -m build --outdir="$PKG_OUT_DIR"
